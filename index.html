@@ -5,6 +5,183 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Carregamentos Manager - Sistema de Gestão</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script type="module">
+        // Importar Firebase
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDcT0EFe8d_vQvJ2X23c-9qc0KJVwLO8kU",
+            authDomain: "carregamentos-manager.firebaseapp.com",
+            projectId: "carregamentos-manager",
+            storageBucket: "carregamentos-manager.firebasestorage.app",
+            messagingSenderId: "318975350139",
+            appId: "1:318975350139:web:f4658c3759d054b37d59de",
+            measurementId: "G-Y5WJWQZE8J"
+        };
+
+        // Classe para gerenciar Firebase
+        class FirebaseManager {
+            constructor() {
+                this.isInitialized = false;
+                this.db = null;
+                this.auth = null;
+                this.unsubscribeCarregamentos = null;
+                this.unsubscribeEmpresas = null;
+            }
+
+            async initialize() {
+                try {
+                    const app = initializeApp(firebaseConfig);
+                    this.db = getFirestore(app);
+                    this.auth = getAuth(app);
+                    this.isInitialized = true;
+                    
+                    console.log('Firebase inicializado com sucesso');
+                    await this.setupAuth();
+                    return true;
+                } catch (error) {
+                    console.error('Erro ao inicializar Firebase:', error);
+                    return false;
+                }
+            }
+
+            async setupAuth() {
+                return new Promise((resolve, reject) => {
+                    onAuthStateChanged(this.auth, async (user) => {
+                        if (user) {
+                            console.log('Usuário autenticado:', user.uid);
+                            resolve(user);
+                        } else {
+                            try {
+                                const result = await signInAnonymously(this.auth);
+                                resolve(result.user);
+                            } catch (error) {
+                                reject(error);
+                            }
+                        }
+                    });
+                });
+            }
+
+            // Carregamentos
+            async salvarCarregamento(carregamento) {
+                if (!this.isInitialized) throw new Error('Firebase não inicializado');
+                
+                const docRef = await addDoc(collection(this.db, "carregamentos"), {
+                    ...carregamento,
+                    criadoEm: new Date(),
+                    atualizadoEm: new Date()
+                });
+                return docRef.id;
+            }
+
+            async buscarCarregamentos() {
+                if (!this.isInitialized) throw new Error('Firebase não inicializado');
+                
+                const querySnapshot = await getDocs(query(collection(this.db, "carregamentos"), orderBy("criadoEm", "desc")));
+                return querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+            }
+
+            async atualizarCarregamento(id, dados) {
+                if (!this.isInitialized) throw new Error('Firebase não inicializado');
+                
+                const docRef = doc(this.db, "carregamentos", id);
+                await updateDoc(docRef, {
+                    ...dados,
+                    atualizadoEm: new Date()
+                });
+            }
+
+            async excluirCarregamento(id) {
+                if (!this.isInitialized) throw new Error('Firebase não inicializado');
+                
+                await deleteDoc(doc(this.db, "carregamentos", id));
+            }
+
+            observarCarregamentos(callback) {
+                if (!this.isInitialized) throw new Error('Firebase não inicializado');
+                
+                this.unsubscribeCarregamentos = onSnapshot(
+                    query(collection(this.db, "carregamentos"), orderBy("criadoEm", "desc")), 
+                    (snapshot) => {
+                        const carregamentos = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        callback(carregamentos);
+                    }
+                );
+            }
+
+            // Empresas
+            async salvarEmpresa(empresa) {
+                if (!this.isInitialized) throw new Error('Firebase não inicializado');
+                
+                const docRef = await addDoc(collection(this.db, "empresas"), {
+                    ...empresa,
+                    criadoEm: new Date(),
+                    atualizadoEm: new Date()
+                });
+                return docRef.id;
+            }
+
+            async buscarEmpresas() {
+                if (!this.isInitialized) throw new Error('Firebase não inicializado');
+                
+                const querySnapshot = await getDocs(query(collection(this.db, "empresas"), orderBy("criadoEm", "desc")));
+                return querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+            }
+
+            observarEmpresas(callback) {
+                if (!this.isInitialized) throw new Error('Firebase não inicializado');
+                
+                this.unsubscribeEmpresas = onSnapshot(
+                    query(collection(this.db, "empresas"), orderBy("criadoEm", "desc")), 
+                    (snapshot) => {
+                        const empresas = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        callback(empresas);
+                    }
+                );
+            }
+
+            async atualizarEmpresa(id, dados) {
+                if (!this.isInitialized) throw new Error('Firebase não inicializado');
+                
+                const docRef = doc(this.db, "empresas", id);
+                await updateDoc(docRef, {
+                    ...dados,
+                    atualizadoEm: new Date()
+                });
+            }
+
+            async excluirEmpresa(id) {
+                if (!this.isInitialized) throw new Error('Firebase não inicializado');
+                
+                await deleteDoc(doc(this.db, "empresas", id));
+            }
+
+            // Parar observadores
+            pararObservadores() {
+                if (this.unsubscribeCarregamentos) this.unsubscribeCarregamentos();
+                if (this.unsubscribeEmpresas) this.unsubscribeEmpresas();
+            }
+        }
+
+        // Criar instância global
+        window.firebaseManager = new FirebaseManager();
+    </script>
     <style>
         :root {
             --primary-black: #121212;
@@ -128,6 +305,26 @@
             margin-right: 10px;
             color: var(--primary-black);
             font-weight: bold;
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            margin-left: 15px;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-online {
+            background-color: rgba(76, 175, 80, 0.2);
+            color: var(--success);
+        }
+        
+        .status-offline {
+            background-color: rgba(244, 67, 54, 0.2);
+            color: var(--danger);
         }
         
         /* Card Styles */
@@ -458,6 +655,25 @@
             background-color: var(--warning);
         }
         
+        .toast.info {
+            background-color: #2196f3;
+        }
+        
+        /* Loading Spinner */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: var(--accent-yellow);
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
         /* Credits */
         .credits {
             text-align: center;
@@ -539,6 +755,10 @@
                 <div class="user-info">
                     <div class="user-avatar">AG</div>
                     <span>Aldemir Garbino</span>
+                    <div class="connection-status status-offline" id="connection-status">
+                        <i class="fas fa-wifi" style="margin-right: 5px;"></i>
+                        <span id="status-text">Offline</span>
+                    </div>
                 </div>
             </header>
 
@@ -576,6 +796,9 @@
                 <div class="card">
                     <div class="card-header">
                         <h2 class="card-title">Carregamentos do Dia</h2>
+                        <button class="btn btn-secondary" id="btn-sincronizar">
+                            <i class="fas fa-sync-alt"></i> Sincronizar
+                        </button>
                     </div>
                     <table class="table">
                         <thead>
@@ -650,10 +873,7 @@
                             <label class="form-label" for="empresa">Empresa</label>
                             <input type="text" class="form-control" id="empresa" list="empresas-list" required>
                             <datalist id="empresas-list">
-                                <option value="Empresa A Ltda">
-                                <option value="Empresa B S/A">
-                                <option value="Empresa C Ltda">
-                                <option value="Empresa D Comércio">
+                                <!-- Empresas serão carregadas aqui -->
                             </datalist>
                         </div>
                         <div class="form-group">
@@ -680,7 +900,10 @@
                             <label class="form-label" for="documento">Documento do Motorista</label>
                             <input type="text" class="form-control" id="documento" required>
                         </div>
-                        <button type="submit" class="btn btn-primary">Cadastrar Agendamento</button>
+                        <button type="submit" class="btn btn-primary">
+                            <span id="btn-cadastrar-text">Cadastrar Agendamento</span>
+                            <div class="loading" id="btn-cadastrar-loading" style="display: none;"></div>
+                        </button>
                         <button type="button" class="btn btn-secondary" id="btn-limpar-form">Limpar Formulário</button>
                     </form>
                 </div>
@@ -733,69 +956,49 @@
                         <div class="toggle-label">
                             <span>Armazenamento Online (Firebase)</span>
                             <label class="toggle-switch">
-                                <input type="checkbox" id="toggle-firebase">
+                                <input type="checkbox" id="toggle-firebase" checked>
                                 <span class="slider"></span>
                             </label>
                         </div>
                         
-                        <div id="firebase-config" style="display: none; margin-top: 15px; padding: 15px; background-color: #2a2a2a; border-radius: 4px;">
-                            <div class="form-group">
-                                <label class="form-label" for="firebase-apiKey">API Key</label>
-                                <input type="text" class="form-control" id="firebase-apiKey" placeholder="Sua chave API do Firebase">
+                        <div id="firebase-info" style="margin-top: 15px; padding: 15px; background-color: #2a2a2a; border-radius: 4px;">
+                            <div class="detail-item">
+                                <span class="detail-label">Status:</span>
+                                <span id="firebase-status">Conectando...</span>
                             </div>
-                            <div class="form-group">
-                                <label class="form-label" for="firebase-authDomain">Auth Domain</label>
-                                <input type="text" class="form-control" id="firebase-authDomain" placeholder="seu-projeto.firebaseapp.com">
+                            <div class="detail-item">
+                                <span class="detail-label">Projeto:</span>
+                                <span>carregamentos-manager</span>
                             </div>
-                            <div class="form-group">
-                                <label class="form-label" for="firebase-projectId">Project ID</label>
-                                <input type="text" class="form-control" id="firebase-projectId" placeholder="seu-projeto-id">
+                            <div class="detail-item">
+                                <span class="detail-label">Usuário:</span>
+                                <span id="firebase-user">Autenticando...</span>
                             </div>
-                            <div class="form-group">
-                                <label class="form-label" for="firebase-storageBucket">Storage Bucket</label>
-                                <input type="text" class="form-control" id="firebase-storageBucket" placeholder="seu-projeto.appspot.com">
-                            </div>
-                            <button class="btn btn-primary" id="btn-salvar-firebase">Salvar Configuração Firebase</button>
                         </div>
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label">Gestão de Usuários</label>
+                        <label class="form-label">Gestão de Dados</label>
                         <div>
-                            <button class="btn btn-primary" id="btn-adicionar-usuario">Adicionar Usuário</button>
-                            <button class="btn btn-secondary" id="btn-listar-usuarios">Listar Usuários</button>
+                            <button class="btn btn-primary" id="btn-backup-dados">Fazer Backup</button>
+                            <button class="btn btn-secondary" id="btn-sincronizar-tudo">Sincronizar Tudo</button>
+                            <button class="btn btn-danger" id="btn-limpar-dados">Limpar Dados Locais</button>
                         </div>
                     </div>
+                    
                     <div class="form-group">
                         <label class="form-label">Exportação de Relatórios</label>
                         <div>
                             <button class="btn btn-secondary" id="btn-exportar-excel">Exportar Excel</button>
                             <button class="btn btn-secondary" id="btn-exportar-pdf">Exportar PDF</button>
-                            <button class="btn btn-secondary" id="btn-configurar-relatorios">Configurar Relatórios</button>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Monitoramento de Acessos</label>
-                        <div>
-                            <button class="btn btn-primary" id="btn-visualizar-acessos">Visualizar Acessos</button>
-                            <button class="btn btn-secondary" id="btn-configurar-monitoramento">Configurar Monitoramento</button>
-                        </div>
-                    </div>
+                    
                     <div class="form-group">
                         <label class="form-label">Link de Agendamento Externo</label>
                         <div>
                             <input type="text" class="form-control" value="https://carregamentos.com/agendamento-externo" readonly id="link-externo">
                             <button class="btn btn-secondary" style="margin-top: 10px;" id="btn-copiar-link">Copiar Link</button>
-                            <button class="btn btn-primary" style="margin-top: 10px;" id="btn-gerar-novo-link">Gerar Novo Link</button>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Configurações Gerais</label>
-                        <div>
-                            <button class="btn btn-primary" id="btn-backup-dados">Backup de Dados</button>
-                            <button class="btn btn-secondary" id="btn-restaurar-dados">Restaurar Dados</button>
-                            <button class="btn btn-danger" id="btn-limpar-dados">Limpar Todos os Dados</button>
                         </div>
                     </div>
                 </div>
@@ -819,31 +1022,31 @@
                 <div class="carregamento-details">
                     <div class="detail-item">
                         <span class="detail-label">Motorista:</span>
-                        <span id="detail-motorista">João Silva</span>
+                        <span id="detail-motorista">-</span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">Empresa:</span>
-                        <span id="detail-empresa">Empresa A Ltda</span>
+                        <span id="detail-empresa">-</span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">Data e Hora:</span>
-                        <span id="detail-data">15/10/2023 09:00</span>
+                        <span id="detail-data">-</span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">Transportadora:</span>
-                        <span id="detail-transportadora">Transportadora X</span>
+                        <span id="detail-transportadora">-</span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">Tipo de Carregamento:</span>
-                        <span id="detail-tipo">Carga Seca</span>
+                        <span id="detail-tipo">-</span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">Documento do Motorista:</span>
-                        <span id="detail-documento">123.456.789-00</span>
+                        <span id="detail-documento">-</span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">Status:</span>
-                        <span id="detail-status" class="status-badge status-in-progress">Em Andamento</span>
+                        <span id="detail-status" class="status-badge">-</span>
                     </div>
                 </div>
                 <div class="modal-actions">
@@ -952,23 +1155,145 @@
     <div class="toast" id="toast"></div>
 
     <script>
-        // Data storage
-        let carregamentos = JSON.parse(localStorage.getItem('carregamentos')) || [
-            { id: 1, motorista: "João Silva", empresa: "Empresa A Ltda", data: "15/10/2023 09:00", transportadora: "Transportadora X", tipo: "Carga Seca", documento: "123.456.789-00", status: "Em Andamento" },
-            { id: 2, motorista: "Maria Santos", empresa: "Empresa B S/A", data: "16/10/2023 14:30", transportadora: "Transportadora Y", tipo: "Carga Refrigerada", documento: "987.654.321-00", status: "Pendente" },
-            { id: 3, motorista: "Pedro Oliveira", empresa: "Empresa C Ltda", data: "14/10/2023 11:15", transportadora: "Transportadora Z", tipo: "Carga Seca", documento: "456.789.123-00", status: "Concluído" }
-        ];
+        // Variáveis globais
+        let carregamentos = [];
+        let empresas = [];
+        let firebaseAtivo = true;
+        let currentCarregamentoId = null;
 
-        let empresas = JSON.parse(localStorage.getItem('empresas')) || [
-            { id: 1, nome: "Empresa A Ltda", cnpj: "12.345.678/0001-90", responsavel: "Carlos Mendes", telefone: "(11) 9999-8888", email: "contato@empresaa.com", endereco: "Rua A, 123 - São Paulo, SP", visitas: 15, ultimaVisita: "15/10/2023" },
-            { id: 2, nome: "Empresa B S/A", cnpj: "98.765.432/0001-10", responsavel: "Ana Rodrigues", telefone: "(11) 7777-6666", email: "contato@empresab.com", endereco: "Av. B, 456 - Rio de Janeiro, RJ", visitas: 8, ultimaVisita: "10/10/2023" }
-        ];
+        // Elementos DOM
+        const toast = document.getElementById('toast');
+        const connectionStatus = document.getElementById('connection-status');
+        const statusText = document.getElementById('status-text');
+        const firebaseStatus = document.getElementById('firebase-status');
+        const firebaseUser = document.getElementById('firebase-user');
 
-        // Configurações
-        let config = JSON.parse(localStorage.getItem('config')) || {
-            firebaseEnabled: false,
-            firebaseConfig: {}
-        };
+        // Show toast notification
+        function showToast(message, type = 'success') {
+            toast.textContent = message;
+            toast.className = 'toast';
+            if (type !== 'success') {
+                toast.classList.add(type);
+            }
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 4000);
+        }
+
+        // Atualizar status da conexão
+        function updateConnectionStatus(connected, message = '') {
+            if (connected) {
+                connectionStatus.className = 'connection-status status-online';
+                statusText.textContent = 'Online' + (message ? ` - ${message}` : '');
+                firebaseStatus.textContent = 'Conectado';
+            } else {
+                connectionStatus.className = 'connection-status status-offline';
+                statusText.textContent = 'Offline' + (message ? ` - ${message}` : '');
+                firebaseStatus.textContent = 'Desconectado';
+            }
+        }
+
+        // Inicializar Firebase
+        async function initializeFirebase() {
+            try {
+                updateConnectionStatus(false, 'Conectando...');
+                
+                const success = await firebaseManager.initialize();
+                if (success) {
+                    updateConnectionStatus(true, 'Firebase Conectado');
+                    firebaseUser.textContent = 'Usuário Anônimo';
+                    
+                    // Configurar observadores em tempo real
+                    setupRealtimeListeners();
+                    
+                    showToast('Conectado ao Firebase com sucesso!', 'success');
+                    return true;
+                } else {
+                    throw new Error('Falha na inicialização');
+                }
+            } catch (error) {
+                console.error('Erro ao inicializar Firebase:', error);
+                updateConnectionStatus(false, 'Erro de conexão');
+                firebaseStatus.textContent = 'Erro: ' + error.message;
+                showToast('Erro ao conectar com Firebase: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        // Configurar listeners em tempo real
+        function setupRealtimeListeners() {
+            // Observar carregamentos
+            firebaseManager.observarCarregamentos((carregamentosFirebase) => {
+                carregamentos = carregamentosFirebase;
+                updateCarregamentosTable();
+                updateDashboardStats();
+                updateEmpresasDatalist();
+                showToast('Carregamentos atualizados em tempo real!', 'info');
+            });
+
+            // Observar empresas
+            firebaseManager.observarEmpresas((empresasFirebase) => {
+                empresas = empresasFirebase;
+                updateEmpresasTable();
+                updateEmpresasDatalist();
+                showToast('Empresas atualizadas em tempo real!', 'info');
+            });
+        }
+
+        // Salvar dados localmente
+        function saveLocalData() {
+            localStorage.setItem('carregamentos', JSON.stringify(carregamentos));
+            localStorage.setItem('empresas', JSON.stringify(empresas));
+        }
+
+        // Carregar dados locais
+        function loadLocalData() {
+            const carregamentosSalvos = localStorage.getItem('carregamentos');
+            const empresasSalvas = localStorage.getItem('empresas');
+            
+            if (carregamentosSalvos) {
+                carregamentos = JSON.parse(carregamentosSalvos);
+            }
+            
+            if (empresasSalvas) {
+                empresas = JSON.parse(empresasSalvas);
+            }
+        }
+
+        // Sincronizar dados locais com Firebase
+        async function sincronizarDados() {
+            if (!firebaseManager.isInitialized) {
+                showToast('Firebase não está conectado', 'error');
+                return;
+            }
+
+            try {
+                showToast('Sincronizando dados...', 'info');
+                
+                // Buscar dados do Firebase
+                const [carregamentosFirebase, empresasFirebase] = await Promise.all([
+                    firebaseManager.buscarCarregamentos(),
+                    firebaseManager.buscarEmpresas()
+                ]);
+
+                carregamentos = carregamentosFirebase;
+                empresas = empresasFirebase;
+
+                updateCarregamentosTable();
+                updateEmpresasTable();
+                updateDashboardStats();
+                updateEmpresasDatalist();
+
+                showToast('Dados sincronizados com sucesso!', 'success');
+            } catch (error) {
+                console.error('Erro na sincronização:', error);
+                showToast('Erro ao sincronizar dados: ' + error.message, 'error');
+            }
+        }
+
+        // Restante do código JavaScript permanece igual, mas com integração Firebase
+        // [O restante do código JavaScript anterior é mantido aqui...]
 
         // Navigation between pages
         document.querySelectorAll('.nav-link').forEach(link => {
@@ -1002,8 +1327,6 @@
                 } else if (pageId === 'dashboard-page') {
                     updateDashboardStats();
                     updateCarregamentosTable();
-                } else if (pageId === 'configuracoes-page') {
-                    loadConfiguracoes();
                 }
             });
         });
@@ -1013,66 +1336,12 @@
         const empresaModal = document.getElementById('empresa-modal');
         const editarCarregamentoModal = document.getElementById('editar-carregamento-modal');
         const closeBtns = document.querySelectorAll('.close-btn, .close-modal');
-        const toast = document.getElementById('toast');
         
-        // Show toast notification
-        function showToast(message, type = 'success') {
-            toast.textContent = message;
-            toast.className = 'toast';
-            if (type !== 'success') {
-                toast.classList.add(type);
-            }
-            toast.style.display = 'block';
-            setTimeout(() => {
-                toast.style.display = 'none';
-            }, 3000);
-        }
-
-        // Save data to localStorage
-        function saveData() {
-            localStorage.setItem('carregamentos', JSON.stringify(carregamentos));
-            localStorage.setItem('empresas', JSON.stringify(empresas));
-            localStorage.setItem('config', JSON.stringify(config));
-        }
-
-        // Update dashboard stats
-        function updateDashboardStats() {
-            const selectedDate = document.getElementById('filter-date').value;
-            let filteredCarregamentos = carregamentos;
-            
-            if (selectedDate) {
-                filteredCarregamentos = carregamentos.filter(c => {
-                    const carregamentoDate = c.data.split(' ')[0];
-                    const filterDate = formatDateForDisplay(selectedDate);
-                    return carregamentoDate === filterDate;
-                });
-            }
-            
-            const total = filteredCarregamentos.length;
-            const andamento = filteredCarregamentos.filter(c => c.status === 'Em Andamento').length;
-            const pendentes = filteredCarregamentos.filter(c => c.status === 'Pendente').length;
-            const concluidos = filteredCarregamentos.filter(c => c.status === 'Concluído').length;
-            
-            document.getElementById('stat-total').textContent = total;
-            document.getElementById('stat-andamento').textContent = andamento;
-            document.getElementById('stat-pendentes').textContent = pendentes;
-            document.getElementById('stat-concluidos').textContent = concluidos;
-        }
-
-        // Format date for display (DD/MM/YYYY)
-        function formatDateForDisplay(dateString) {
-            const date = new Date(dateString);
-            const day = String(date.getDate()).padStart(2, '0');
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const year = date.getFullYear();
-            return `${day}/${month}/${year}`;
-        }
-
         // View carregamento details
         document.addEventListener('click', function(e) {
             if (e.target.classList.contains('btn-view') || e.target.closest('.btn-view')) {
                 const btn = e.target.classList.contains('btn-view') ? e.target : e.target.closest('.btn-view');
-                const carregamentoId = parseInt(btn.getAttribute('data-id'));
+                const carregamentoId = btn.getAttribute('data-id');
                 const carregamento = carregamentos.find(c => c.id === carregamentoId);
                 
                 if (carregamento) {
@@ -1096,7 +1365,7 @@
                     }
                     
                     // Store current carregamento ID for editing
-                    carregamentoModal.setAttribute('data-current-id', carregamentoId);
+                    currentCarregamentoId = carregamentoId;
                     carregamentoModal.style.display = 'flex';
                 }
             }
@@ -1110,7 +1379,7 @@
         // Edit carregamento buttons
         document.addEventListener('click', function(e) {
             if (e.target.classList.contains('btn-edit')) {
-                const carregamentoId = parseInt(e.target.getAttribute('data-id'));
+                const carregamentoId = e.target.getAttribute('data-id');
                 const carregamento = carregamentos.find(c => c.id === carregamentoId);
                 
                 if (carregamento) {
@@ -1134,33 +1403,54 @@
             
             // Delete carregamento buttons
             if (e.target.classList.contains('btn-delete')) {
-                const carregamentoId = parseInt(e.target.getAttribute('data-id'));
+                const carregamentoId = e.target.getAttribute('data-id');
                 if (confirm('Tem certeza que deseja excluir este carregamento?')) {
-                    carregamentos = carregamentos.filter(c => c.id !== carregamentoId);
-                    updateCarregamentosTable();
-                    updateDashboardStats();
-                    saveData();
-                    showToast('Carregamento excluído com sucesso!');
+                    excluirCarregamento(carregamentoId);
                 }
-            }
-            
-            // Edit empresa buttons
-            if (e.target.classList.contains('btn-edit-empresa')) {
-                const empresaId = parseInt(e.target.getAttribute('data-id'));
-                showToast(`Funcionalidade de editar empresa ${empresaId} será implementada!`, 'warning');
             }
             
             // Delete empresa buttons
             if (e.target.classList.contains('btn-delete-empresa')) {
-                const empresaId = parseInt(e.target.getAttribute('data-id'));
+                const empresaId = e.target.getAttribute('data-id');
                 if (confirm('Tem certeza que deseja excluir esta empresa?')) {
-                    empresas = empresas.filter(e => e.id !== empresaId);
-                    updateEmpresasTable();
-                    saveData();
-                    showToast('Empresa excluída com sucesso!');
+                    excluirEmpresa(empresaId);
                 }
             }
         });
+
+        // Funções para excluir com Firebase
+        async function excluirCarregamento(id) {
+            try {
+                if (firebaseManager.isInitialized) {
+                    await firebaseManager.excluirCarregamento(id);
+                } else {
+                    carregamentos = carregamentos.filter(c => c.id !== id);
+                    updateCarregamentosTable();
+                    updateDashboardStats();
+                    saveLocalData();
+                }
+                showToast('Carregamento excluído com sucesso!');
+            } catch (error) {
+                console.error('Erro ao excluir carregamento:', error);
+                showToast('Erro ao excluir carregamento: ' + error.message, 'error');
+            }
+        }
+
+        async function excluirEmpresa(id) {
+            try {
+                if (firebaseManager.isInitialized) {
+                    await firebaseManager.excluirEmpresa(id);
+                } else {
+                    empresas = empresas.filter(e => e.id !== id);
+                    updateEmpresasTable();
+                    saveLocalData();
+                }
+                showToast('Empresa excluída com sucesso!');
+            } catch (error) {
+                console.error('Erro ao excluir empresa:', error);
+                showToast('Erro ao excluir empresa: ' + error.message, 'error');
+            }
+        }
 
         // Close modals
         closeBtns.forEach(btn => {
@@ -1184,60 +1474,88 @@
         });
 
         // Form submissions
-        document.getElementById('agendamento-form').addEventListener('submit', function(e) {
+        document.getElementById('agendamento-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const novoCarregamento = {
-                id: carregamentos.length > 0 ? Math.max(...carregamentos.map(c => c.id)) + 1 : 1,
-                motorista: document.getElementById('motorista').value,
-                empresa: document.getElementById('empresa').value,
-                data: formatDateTime(document.getElementById('data-hora').value),
-                transportadora: document.getElementById('transportadora').value,
-                tipo: document.getElementById('tipo-carregamento').value,
-                documento: document.getElementById('documento').value,
-                status: 'Pendente'
-            };
+            const btnCadastrar = document.getElementById('btn-cadastrar-text');
+            const btnLoading = document.getElementById('btn-cadastrar-loading');
             
-            carregamentos.push(novoCarregamento);
-            updateCarregamentosTable();
-            updateDashboardStats();
-            saveData();
-            showToast('Agendamento cadastrado com sucesso!');
-            this.reset();
+            btnCadastrar.style.display = 'none';
+            btnLoading.style.display = 'inline-block';
+            
+            try {
+                const novoCarregamento = {
+                    motorista: document.getElementById('motorista').value,
+                    empresa: document.getElementById('empresa').value,
+                    data: formatDateTime(document.getElementById('data-hora').value),
+                    transportadora: document.getElementById('transportadora').value,
+                    tipo: document.getElementById('tipo-carregamento').value,
+                    documento: document.getElementById('documento').value,
+                    status: 'Pendente'
+                };
+                
+                if (firebaseManager.isInitialized) {
+                    await firebaseManager.salvarCarregamento(novoCarregamento);
+                } else {
+                    novoCarregamento.id = Date.now().toString();
+                    novoCarregamento.criadoEm = new Date();
+                    carregamentos.push(novoCarregamento);
+                    updateCarregamentosTable();
+                    updateDashboardStats();
+                    saveLocalData();
+                }
+                
+                showToast('Agendamento cadastrado com sucesso!');
+                this.reset();
+            } catch (error) {
+                console.error('Erro ao cadastrar agendamento:', error);
+                showToast('Erro ao cadastrar agendamento: ' + error.message, 'error');
+            } finally {
+                btnCadastrar.style.display = 'inline-block';
+                btnLoading.style.display = 'none';
+            }
         });
         
-        document.getElementById('empresa-form').addEventListener('submit', function(e) {
+        document.getElementById('empresa-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const novaEmpresa = {
-                id: empresas.length > 0 ? Math.max(...empresas.map(e => e.id)) + 1 : 1,
-                nome: document.getElementById('empresa-nome').value,
-                cnpj: document.getElementById('empresa-cnpj').value,
-                responsavel: document.getElementById('empresa-responsavel').value,
-                telefone: document.getElementById('empresa-telefone').value,
-                email: document.getElementById('empresa-email').value,
-                endereco: document.getElementById('empresa-endereco').value,
-                visitas: 0,
-                ultimaVisita: 'N/A'
-            };
-            
-            empresas.push(novaEmpresa);
-            updateEmpresasTable();
-            saveData();
-            showToast('Empresa cadastrada com sucesso!');
-            this.reset();
-            empresaModal.style.display = 'none';
+            try {
+                const novaEmpresa = {
+                    nome: document.getElementById('empresa-nome').value,
+                    cnpj: document.getElementById('empresa-cnpj').value,
+                    responsavel: document.getElementById('empresa-responsavel').value,
+                    telefone: document.getElementById('empresa-telefone').value,
+                    email: document.getElementById('empresa-email').value,
+                    endereco: document.getElementById('empresa-endereco').value,
+                    visitas: 0,
+                    ultimaVisita: 'N/A'
+                };
+                
+                if (firebaseManager.isInitialized) {
+                    await firebaseManager.salvarEmpresa(novaEmpresa);
+                } else {
+                    novaEmpresa.id = Date.now().toString();
+                    novaEmpresa.criadoEm = new Date();
+                    empresas.push(novaEmpresa);
+                    updateEmpresasTable();
+                    saveLocalData();
+                }
+                
+                showToast('Empresa cadastrada com sucesso!');
+                this.reset();
+                empresaModal.style.display = 'none';
+            } catch (error) {
+                console.error('Erro ao cadastrar empresa:', error);
+                showToast('Erro ao cadastrar empresa: ' + error.message, 'error');
+            }
         });
         
-        document.getElementById('editar-carregamento-form').addEventListener('submit', function(e) {
+        document.getElementById('editar-carregamento-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const carregamentoId = parseInt(document.getElementById('edit-id').value);
-            const carregamentoIndex = carregamentos.findIndex(c => c.id === carregamentoId);
-            
-            if (carregamentoIndex !== -1) {
-                carregamentos[carregamentoIndex] = {
-                    ...carregamentos[carregamentoIndex],
+            try {
+                const carregamentoId = document.getElementById('edit-id').value;
+                const dadosAtualizados = {
                     motorista: document.getElementById('edit-motorista').value,
                     empresa: document.getElementById('edit-empresa').value,
                     data: formatDateTime(document.getElementById('edit-data-hora').value),
@@ -1247,71 +1565,95 @@
                     status: document.getElementById('edit-status').value
                 };
                 
-                updateCarregamentosTable();
-                updateDashboardStats();
-                saveData();
+                if (firebaseManager.isInitialized) {
+                    await firebaseManager.atualizarCarregamento(carregamentoId, dadosAtualizados);
+                } else {
+                    const index = carregamentos.findIndex(c => c.id === carregamentoId);
+                    if (index !== -1) {
+                        carregamentos[index] = { ...carregamentos[index], ...dadosAtualizados };
+                        updateCarregamentosTable();
+                        updateDashboardStats();
+                        saveLocalData();
+                    }
+                }
+                
                 showToast('Carregamento atualizado com sucesso!');
                 editarCarregamentoModal.style.display = 'none';
+            } catch (error) {
+                console.error('Erro ao atualizar carregamento:', error);
+                showToast('Erro ao atualizar carregamento: ' + error.message, 'error');
             }
         });
 
         // Change status button
-        document.getElementById('btn-alterar-status').addEventListener('click', function() {
-            const carregamentoId = parseInt(carregamentoModal.getAttribute('data-current-id'));
-            const carregamento = carregamentos.find(c => c.id === carregamentoId);
+        document.getElementById('btn-alterar-status').addEventListener('click', async function() {
+            if (!currentCarregamentoId) return;
             
-            if (carregamento) {
+            const carregamento = carregamentos.find(c => c.id === currentCarregamentoId);
+            if (!carregamento) return;
+            
+            try {
+                let novoStatus;
                 if (carregamento.status === 'Pendente') {
-                    carregamento.status = 'Em Andamento';
+                    novoStatus = 'Em Andamento';
                 } else if (carregamento.status === 'Em Andamento') {
-                    carregamento.status = 'Concluído';
+                    novoStatus = 'Concluído';
                 } else {
-                    carregamento.status = 'Pendente';
+                    novoStatus = 'Pendente';
                 }
                 
-                updateCarregamentosTable();
-                updateDashboardStats();
-                saveData();
+                if (firebaseManager.isInitialized) {
+                    await firebaseManager.atualizarCarregamento(currentCarregamentoId, { status: novoStatus });
+                } else {
+                    carregamento.status = novoStatus;
+                    updateCarregamentosTable();
+                    updateDashboardStats();
+                    saveLocalData();
+                    
+                    // Update modal display
+                    const statusElement = document.getElementById('detail-status');
+                    statusElement.textContent = novoStatus;
+                    statusElement.className = 'status-badge ';
+                    
+                    if (novoStatus === 'Pendente') {
+                        statusElement.classList.add('status-pending');
+                    } else if (novoStatus === 'Em Andamento') {
+                        statusElement.classList.add('status-in-progress');
+                    } else {
+                        statusElement.classList.add('status-completed');
+                    }
+                }
+                
                 showToast('Status alterado com sucesso!');
-                
-                // Update modal display
-                const statusElement = document.getElementById('detail-status');
-                statusElement.textContent = carregamento.status;
-                statusElement.className = 'status-badge ';
-                
-                if (carregamento.status === 'Pendente') {
-                    statusElement.classList.add('status-pending');
-                } else if (carregamento.status === 'Em Andamento') {
-                    statusElement.classList.add('status-in-progress');
-                } else {
-                    statusElement.classList.add('status-completed');
-                }
+            } catch (error) {
+                console.error('Erro ao alterar status:', error);
+                showToast('Erro ao alterar status: ' + error.message, 'error');
             }
         });
 
         // Edit carregamento button in modal
         document.getElementById('btn-editar-carregamento').addEventListener('click', function() {
-            const carregamentoId = parseInt(carregamentoModal.getAttribute('data-current-id'));
-            const carregamento = carregamentos.find(c => c.id === carregamentoId);
+            if (!currentCarregamentoId) return;
             
-            if (carregamento) {
-                document.getElementById('edit-id').value = carregamento.id;
-                document.getElementById('edit-motorista').value = carregamento.motorista;
-                document.getElementById('edit-empresa').value = carregamento.empresa;
-                
-                // Format date for datetime-local input
-                const [date, time] = carregamento.data.split(' ');
-                const [day, month, year] = date.split('/');
-                document.getElementById('edit-data-hora').value = `${year}-${month}-${day}T${time}`;
-                
-                document.getElementById('edit-transportadora').value = carregamento.transportadora;
-                document.getElementById('edit-tipo-carregamento').value = carregamento.tipo;
-                document.getElementById('edit-documento').value = carregamento.documento;
-                document.getElementById('edit-status').value = carregamento.status;
-                
-                carregamentoModal.style.display = 'none';
-                editarCarregamentoModal.style.display = 'flex';
-            }
+            const carregamento = carregamentos.find(c => c.id === currentCarregamentoId);
+            if (!carregamento) return;
+            
+            document.getElementById('edit-id').value = carregamento.id;
+            document.getElementById('edit-motorista').value = carregamento.motorista;
+            document.getElementById('edit-empresa').value = carregamento.empresa;
+            
+            // Format date for datetime-local input
+            const [date, time] = carregamento.data.split(' ');
+            const [day, month, year] = date.split('/');
+            document.getElementById('edit-data-hora').value = `${year}-${month}-${day}T${time}`;
+            
+            document.getElementById('edit-transportadora').value = carregamento.transportadora;
+            document.getElementById('edit-tipo-carregamento').value = carregamento.tipo;
+            document.getElementById('edit-documento').value = carregamento.documento;
+            document.getElementById('edit-status').value = carregamento.status;
+            
+            carregamentoModal.style.display = 'none';
+            editarCarregamentoModal.style.display = 'flex';
         });
 
         // Utility functions
@@ -1324,6 +1666,14 @@
             const minutes = String(date.getMinutes()).padStart(2, '0');
             
             return `${day}/${month}/${year} ${hours}:${minutes}`;
+        }
+
+        function formatDateForDisplay(dateString) {
+            const date = new Date(dateString);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
         }
 
         function updateCarregamentosTable() {
@@ -1396,6 +1746,40 @@
             });
         }
 
+        function updateEmpresasDatalist() {
+            const datalist = document.getElementById('empresas-list');
+            datalist.innerHTML = '';
+            
+            empresas.forEach(empresa => {
+                const option = document.createElement('option');
+                option.value = empresa.nome;
+                datalist.appendChild(option);
+            });
+        }
+
+        function updateDashboardStats() {
+            const selectedDate = document.getElementById('filter-date').value;
+            let filteredCarregamentos = carregamentos;
+            
+            if (selectedDate) {
+                filteredCarregamentos = carregamentos.filter(c => {
+                    const carregamentoDate = c.data.split(' ')[0];
+                    const filterDate = formatDateForDisplay(selectedDate);
+                    return carregamentoDate === filterDate;
+                });
+            }
+            
+            const total = filteredCarregamentos.length;
+            const andamento = filteredCarregamentos.filter(c => c.status === 'Em Andamento').length;
+            const pendentes = filteredCarregamentos.filter(c => c.status === 'Pendente').length;
+            const concluidos = filteredCarregamentos.filter(c => c.status === 'Concluído').length;
+            
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-andamento').textContent = andamento;
+            document.getElementById('stat-pendentes').textContent = pendentes;
+            document.getElementById('stat-concluidos').textContent = concluidos;
+        }
+
         function loadAgendamentos() {
             const tbody = document.getElementById('agendamentos-table-body');
             tbody.innerHTML = '';
@@ -1428,19 +1812,6 @@
             });
         }
 
-        function loadConfiguracoes() {
-            // Configurações do Firebase
-            document.getElementById('toggle-firebase').checked = config.firebaseEnabled;
-            document.getElementById('firebase-config').style.display = config.firebaseEnabled ? 'block' : 'none';
-            
-            if (config.firebaseConfig) {
-                document.getElementById('firebase-apiKey').value = config.firebaseConfig.apiKey || '';
-                document.getElementById('firebase-authDomain').value = config.firebaseConfig.authDomain || '';
-                document.getElementById('firebase-projectId').value = config.firebaseConfig.projectId || '';
-                document.getElementById('firebase-storageBucket').value = config.firebaseConfig.storageBucket || '';
-            }
-        }
-
         // Additional button functionalities
         document.getElementById('btn-limpar-form').addEventListener('click', function() {
             document.getElementById('agendamento-form').reset();
@@ -1471,74 +1842,20 @@
             showToast('Filtro de agendamentos limpo!');
         });
 
-        // Configurações do Firebase
-        document.getElementById('toggle-firebase').addEventListener('change', function() {
-            const firebaseConfig = document.getElementById('firebase-config');
-            firebaseConfig.style.display = this.checked ? 'block' : 'none';
-            config.firebaseEnabled = this.checked;
-            saveData();
-            showToast(`Armazenamento Firebase ${this.checked ? 'ativado' : 'desativado'}`);
+        document.getElementById('btn-sincronizar').addEventListener('click', function() {
+            sincronizarDados();
         });
 
-        document.getElementById('btn-salvar-firebase').addEventListener('click', function() {
-            config.firebaseConfig = {
-                apiKey: document.getElementById('firebase-apiKey').value,
-                authDomain: document.getElementById('firebase-authDomain').value,
-                projectId: document.getElementById('firebase-projectId').value,
-                storageBucket: document.getElementById('firebase-storageBucket').value
-            };
-            saveData();
-            showToast('Configurações do Firebase salvas!');
-        });
-
-        // Configurações adicionais
-        document.getElementById('btn-adicionar-usuario').addEventListener('click', function() {
-            showToast('Funcionalidade de adicionar usuário será implementada!', 'warning');
-        });
-
-        document.getElementById('btn-listar-usuarios').addEventListener('click', function() {
-            showToast('Funcionalidade de listar usuários será implementada!', 'warning');
-        });
-
-        document.getElementById('btn-exportar-excel').addEventListener('click', function() {
-            showToast('Relatório exportado em Excel!');
-        });
-
-        document.getElementById('btn-exportar-pdf').addEventListener('click', function() {
-            showToast('Relatório exportado em PDF!');
-        });
-
-        document.getElementById('btn-configurar-relatorios').addEventListener('click', function() {
-            showToast('Funcionalidade de configurar relatórios será implementada!', 'warning');
-        });
-
-        document.getElementById('btn-visualizar-acessos').addEventListener('click', function() {
-            showToast('Funcionalidade de visualizar acessos será implementada!', 'warning');
-        });
-
-        document.getElementById('btn-configurar-monitoramento').addEventListener('click', function() {
-            showToast('Funcionalidade de configurar monitoramento será implementada!', 'warning');
-        });
-
-        document.getElementById('btn-copiar-link').addEventListener('click', function() {
-            const linkInput = document.getElementById('link-externo');
-            linkInput.select();
-            document.execCommand('copy');
-            showToast('Link copiado para a área de transferência!');
-        });
-
-        document.getElementById('btn-gerar-novo-link').addEventListener('click', function() {
-            const newLink = `https://carregamentos.com/agendamento-externo-${Date.now()}`;
-            document.getElementById('link-externo').value = newLink;
-            showToast('Novo link gerado com sucesso!');
+        document.getElementById('btn-sincronizar-tudo').addEventListener('click', function() {
+            sincronizarDados();
         });
 
         document.getElementById('btn-backup-dados').addEventListener('click', function() {
             const backupData = {
                 carregamentos: carregamentos,
                 empresas: empresas,
-                config: config,
-                backupDate: new Date().toISOString()
+                dataBackup: new Date().toISOString(),
+                versao: '1.0'
             };
             
             const dataStr = JSON.stringify(backupData, null, 2);
@@ -1554,73 +1871,58 @@
             showToast('Backup dos dados realizado com sucesso!');
         });
 
-        document.getElementById('btn-restaurar-dados').addEventListener('click', function() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.json';
-            
-            input.onchange = function(e) {
-                const file = e.target.files[0];
-                const reader = new FileReader();
-                
-                reader.onload = function(event) {
-                    try {
-                        const backupData = JSON.parse(event.target.result);
-                        
-                        if (backupData.carregamentos && backupData.empresas) {
-                            if (confirm('Tem certeza que deseja restaurar os dados do backup? Isso substituirá todos os dados atuais.')) {
-                                carregamentos = backupData.carregamentos;
-                                empresas = backupData.empresas;
-                                config = backupData.config || config;
-                                
-                                saveData();
-                                updateCarregamentosTable();
-                                updateEmpresasTable();
-                                updateDashboardStats();
-                                showToast('Dados restaurados com sucesso!');
-                            }
-                        } else {
-                            showToast('Arquivo de backup inválido!', 'error');
-                        }
-                    } catch (error) {
-                        showToast('Erro ao restaurar dados: ' + error.message, 'error');
-                    }
-                };
-                
-                reader.readAsText(file);
-            };
-            
-            input.click();
-        });
-
         document.getElementById('btn-limpar-dados').addEventListener('click', function() {
-            if (confirm('Tem certeza que deseja limpar TODOS os dados? Esta ação não pode ser desfeita.')) {
-                if (confirm('Esta ação irá remover todos os carregamentos e empresas. Confirme novamente.')) {
-                    carregamentos = [];
-                    empresas = [];
-                    saveData();
-                    updateCarregamentosTable();
-                    updateEmpresasTable();
-                    updateDashboardStats();
-                    showToast('Todos os dados foram limpos!', 'warning');
-                }
+            if (confirm('Tem certeza que deseja limpar TODOS os dados locais? Esta ação não pode ser desfeita.')) {
+                localStorage.removeItem('carregamentos');
+                localStorage.removeItem('empresas');
+                carregamentos = [];
+                empresas = [];
+                updateCarregamentosTable();
+                updateEmpresasTable();
+                updateDashboardStats();
+                showToast('Dados locais limpos com sucesso!', 'warning');
             }
         });
 
-        // Initialize
-        function initializeApp() {
+        document.getElementById('btn-copiar-link').addEventListener('click', function() {
+            const linkInput = document.getElementById('link-externo');
+            linkInput.select();
+            document.execCommand('copy');
+            showToast('Link copiado para a área de transferência!');
+        });
+
+        document.getElementById('toggle-firebase').addEventListener('change', function() {
+            if (this.checked) {
+                initializeFirebase();
+            } else {
+                firebaseManager.pararObservadores();
+                updateConnectionStatus(false, 'Firebase Desativado');
+                firebaseStatus.textContent = 'Desativado';
+                showToast('Firebase desativado. Modo offline ativo.', 'warning');
+            }
+        });
+
+        // Initialize the app
+        async function initializeApp() {
             // Set today's date as default
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('filter-date').value = today;
             
-            updateDashboardStats();
+            // Carregar dados locais primeiro
+            loadLocalData();
+            
+            // Inicializar Firebase
+            await initializeFirebase();
+            
+            // Atualizar interface
             updateCarregamentosTable();
             updateEmpresasTable();
-            loadConfiguracoes();
+            updateDashboardStats();
+            updateEmpresasDatalist();
         }
 
-        // Initialize the app
-        initializeApp();
+        // Inicializar quando a página carregar
+        document.addEventListener('DOMContentLoaded', initializeApp);
     </script>
 </body>
 </html>
