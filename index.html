@@ -26,43 +26,84 @@
         class FirebaseManager {
             constructor() {
                 this.isInitialized = false;
+                this.isConnected = false;
                 this.db = null;
                 this.auth = null;
                 this.unsubscribeCarregamentos = null;
                 this.unsubscribeEmpresas = null;
+                this.connectionCallbacks = [];
             }
 
             async initialize() {
                 try {
+                    console.log('Iniciando inicialização do Firebase...');
                     const app = initializeApp(firebaseConfig);
                     this.db = getFirestore(app);
                     this.auth = getAuth(app);
                     this.isInitialized = true;
                     
                     console.log('Firebase inicializado com sucesso');
-                    await this.setupAuth();
+                    
+                    // Configurar detecção de conexão
+                    this.setupConnectionMonitoring();
+                    
+                    // Configurar auth sem bloquear a inicialização
+                    this.setupAuth();
+                    
                     return true;
                 } catch (error) {
                     console.error('Erro ao inicializar Firebase:', error);
+                    this.isConnected = false;
+                    this.notifyConnectionChange(false, error.message);
                     return false;
                 }
             }
 
+            setupConnectionMonitoring() {
+                // Verificar conexão tentando uma operação simples
+                this.checkConnection();
+                
+                // Verificar periodicamente
+                setInterval(() => {
+                    this.checkConnection();
+                }, 30000); // A cada 30 segundos
+            }
+
+            async checkConnection() {
+                if (!this.isInitialized) return;
+                
+                try {
+                    // Tentar uma operação simples para verificar conexão
+                    await getDocs(query(collection(this.db, "carregamentos"), orderBy("criadoEm", "desc")));
+                    if (!this.isConnected) {
+                        this.isConnected = true;
+                        this.notifyConnectionChange(true, "Conectado");
+                    }
+                } catch (error) {
+                    if (this.isConnected) {
+                        this.isConnected = false;
+                        this.notifyConnectionChange(false, error.message);
+                    }
+                }
+            }
+
             async setupAuth() {
-                return new Promise((resolve, reject) => {
-                    onAuthStateChanged(this.auth, async (user) => {
-                        if (user) {
-                            console.log('Usuário autenticado:', user.uid);
-                            resolve(user);
-                        } else {
-                            try {
-                                const result = await signInAnonymously(this.auth);
-                                resolve(result.user);
-                            } catch (error) {
-                                reject(error);
-                            }
-                        }
-                    });
+                try {
+                    await signInAnonymously(this.auth);
+                    console.log('Autenticação anônima realizada com sucesso');
+                } catch (error) {
+                    console.warn('Erro na autenticação anônima (pode ser normal em alguns casos):', error);
+                    // Não marcar como erro se a autenticação falhar, pois o Firestore pode funcionar mesmo assim
+                }
+            }
+
+            onConnectionChange(callback) {
+                this.connectionCallbacks.push(callback);
+            }
+
+            notifyConnectionChange(connected, message) {
+                this.connectionCallbacks.forEach(callback => {
+                    callback(connected, message);
                 });
             }
 
@@ -70,106 +111,168 @@
             async salvarCarregamento(carregamento) {
                 if (!this.isInitialized) throw new Error('Firebase não inicializado');
                 
-                const docRef = await addDoc(collection(this.db, "carregamentos"), {
-                    ...carregamento,
-                    criadoEm: new Date(),
-                    atualizadoEm: new Date()
-                });
-                return docRef.id;
+                try {
+                    const docRef = await addDoc(collection(this.db, "carregamentos"), {
+                        ...carregamento,
+                        criadoEm: new Date(),
+                        atualizadoEm: new Date()
+                    });
+                    console.log('Carregamento salvo com ID:', docRef.id);
+                    return docRef.id;
+                } catch (error) {
+                    console.error('Erro ao salvar carregamento:', error);
+                    throw error;
+                }
             }
 
             async buscarCarregamentos() {
                 if (!this.isInitialized) throw new Error('Firebase não inicializado');
                 
-                const querySnapshot = await getDocs(query(collection(this.db, "carregamentos"), orderBy("criadoEm", "desc")));
-                return querySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
+                try {
+                    const querySnapshot = await getDocs(query(collection(this.db, "carregamentos"), orderBy("criadoEm", "desc")));
+                    return querySnapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                } catch (error) {
+                    console.error('Erro ao buscar carregamentos:', error);
+                    throw error;
+                }
             }
 
             async atualizarCarregamento(id, dados) {
                 if (!this.isInitialized) throw new Error('Firebase não inicializado');
                 
-                const docRef = doc(this.db, "carregamentos", id);
-                await updateDoc(docRef, {
-                    ...dados,
-                    atualizadoEm: new Date()
-                });
+                try {
+                    const docRef = doc(this.db, "carregamentos", id);
+                    await updateDoc(docRef, {
+                        ...dados,
+                        atualizadoEm: new Date()
+                    });
+                    console.log('Carregamento atualizado:', id);
+                } catch (error) {
+                    console.error('Erro ao atualizar carregamento:', error);
+                    throw error;
+                }
             }
 
             async excluirCarregamento(id) {
                 if (!this.isInitialized) throw new Error('Firebase não inicializado');
                 
-                await deleteDoc(doc(this.db, "carregamentos", id));
+                try {
+                    await deleteDoc(doc(this.db, "carregamentos", id));
+                    console.log('Carregamento excluído:', id);
+                } catch (error) {
+                    console.error('Erro ao excluir carregamento:', error);
+                    throw error;
+                }
             }
 
             observarCarregamentos(callback) {
                 if (!this.isInitialized) throw new Error('Firebase não inicializado');
                 
-                this.unsubscribeCarregamentos = onSnapshot(
-                    query(collection(this.db, "carregamentos"), orderBy("criadoEm", "desc")), 
-                    (snapshot) => {
-                        const carregamentos = snapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
-                        callback(carregamentos);
-                    }
-                );
+                try {
+                    this.unsubscribeCarregamentos = onSnapshot(
+                        query(collection(this.db, "carregamentos"), orderBy("criadoEm", "desc")), 
+                        (snapshot) => {
+                            const carregamentos = snapshot.docs.map(doc => ({
+                                id: doc.id,
+                                ...doc.data()
+                            }));
+                            callback(carregamentos);
+                        },
+                        (error) => {
+                            console.error('Erro no listener de carregamentos:', error);
+                            // Não disparar erro global por problemas no listener
+                        }
+                    );
+                } catch (error) {
+                    console.error('Erro ao configurar observer de carregamentos:', error);
+                }
             }
 
             // Empresas
             async salvarEmpresa(empresa) {
                 if (!this.isInitialized) throw new Error('Firebase não inicializado');
                 
-                const docRef = await addDoc(collection(this.db, "empresas"), {
-                    ...empresa,
-                    criadoEm: new Date(),
-                    atualizadoEm: new Date()
-                });
-                return docRef.id;
+                try {
+                    const docRef = await addDoc(collection(this.db, "empresas"), {
+                        ...empresa,
+                        criadoEm: new Date(),
+                        atualizadoEm: new Date()
+                    });
+                    console.log('Empresa salva com ID:', docRef.id);
+                    return docRef.id;
+                } catch (error) {
+                    console.error('Erro ao salvar empresa:', error);
+                    throw error;
+                }
             }
 
             async buscarEmpresas() {
                 if (!this.isInitialized) throw new Error('Firebase não inicializado');
                 
-                const querySnapshot = await getDocs(query(collection(this.db, "empresas"), orderBy("criadoEm", "desc")));
-                return querySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
+                try {
+                    const querySnapshot = await getDocs(query(collection(this.db, "empresas"), orderBy("criadoEm", "desc")));
+                    return querySnapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                } catch (error) {
+                    console.error('Erro ao buscar empresas:', error);
+                    throw error;
+                }
             }
 
             observarEmpresas(callback) {
                 if (!this.isInitialized) throw new Error('Firebase não inicializado');
                 
-                this.unsubscribeEmpresas = onSnapshot(
-                    query(collection(this.db, "empresas"), orderBy("criadoEm", "desc")), 
-                    (snapshot) => {
-                        const empresas = snapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
-                        callback(empresas);
-                    }
-                );
+                try {
+                    this.unsubscribeEmpresas = onSnapshot(
+                        query(collection(this.db, "empresas"), orderBy("criadoEm", "desc")), 
+                        (snapshot) => {
+                            const empresas = snapshot.docs.map(doc => ({
+                                id: doc.id,
+                                ...doc.data()
+                            }));
+                            callback(empresas);
+                        },
+                        (error) => {
+                            console.error('Erro no listener de empresas:', error);
+                            // Não disparar erro global por problemas no listener
+                        }
+                    );
+                } catch (error) {
+                    console.error('Erro ao configurar observer de empresas:', error);
+                }
             }
 
             async atualizarEmpresa(id, dados) {
                 if (!this.isInitialized) throw new Error('Firebase não inicializado');
                 
-                const docRef = doc(this.db, "empresas", id);
-                await updateDoc(docRef, {
-                    ...dados,
-                    atualizadoEm: new Date()
-                });
+                try {
+                    const docRef = doc(this.db, "empresas", id);
+                    await updateDoc(docRef, {
+                        ...dados,
+                        atualizadoEm: new Date()
+                    });
+                    console.log('Empresa atualizada:', id);
+                } catch (error) {
+                    console.error('Erro ao atualizar empresa:', error);
+                    throw error;
+                }
             }
 
             async excluirEmpresa(id) {
                 if (!this.isInitialized) throw new Error('Firebase não inicializado');
                 
-                await deleteDoc(doc(this.db, "empresas", id));
+                try {
+                    await deleteDoc(doc(this.db, "empresas", id));
+                    console.log('Empresa excluída:', id);
+                } catch (error) {
+                    console.error('Erro ao excluir empresa:', error);
+                    throw error;
+                }
             }
 
             // Parar observadores
@@ -325,6 +428,11 @@
         .status-offline {
             background-color: rgba(244, 67, 54, 0.2);
             color: var(--danger);
+        }
+        
+        .status-connecting {
+            background-color: rgba(255, 152, 0, 0.2);
+            color: var(--warning);
         }
         
         /* Card Styles */
@@ -755,9 +863,9 @@
                 <div class="user-info">
                     <div class="user-avatar">AG</div>
                     <span>Aldemir Garbino</span>
-                    <div class="connection-status status-offline" id="connection-status">
+                    <div class="connection-status status-connecting" id="connection-status">
                         <i class="fas fa-wifi" style="margin-right: 5px;"></i>
-                        <span id="status-text">Offline</span>
+                        <span id="status-text">Conectando...</span>
                     </div>
                 </div>
             </header>
@@ -1187,6 +1295,11 @@
                 connectionStatus.className = 'connection-status status-online';
                 statusText.textContent = 'Online' + (message ? ` - ${message}` : '');
                 firebaseStatus.textContent = 'Conectado';
+                firebaseUser.textContent = 'Usuário Anônimo';
+            } else if (message === 'Conectando...') {
+                connectionStatus.className = 'connection-status status-connecting';
+                statusText.textContent = message;
+                firebaseStatus.textContent = 'Conectando...';
             } else {
                 connectionStatus.className = 'connection-status status-offline';
                 statusText.textContent = 'Offline' + (message ? ` - ${message}` : '');
@@ -1199,15 +1312,24 @@
             try {
                 updateConnectionStatus(false, 'Conectando...');
                 
+                // Configurar callback para mudanças de conexão
+                firebaseManager.onConnectionChange((connected, message) => {
+                    updateConnectionStatus(connected, message);
+                });
+                
                 const success = await firebaseManager.initialize();
                 if (success) {
-                    updateConnectionStatus(true, 'Firebase Conectado');
-                    firebaseUser.textContent = 'Usuário Anônimo';
+                    // A conexão será atualizada pelo monitoring do FirebaseManager
+                    console.log('Firebase inicializado com sucesso');
                     
                     // Configurar observadores em tempo real
                     setupRealtimeListeners();
                     
-                    showToast('Conectado ao Firebase com sucesso!', 'success');
+                    // Tentar carregar dados do Firebase
+                    setTimeout(() => {
+                        sincronizarDados();
+                    }, 2000);
+                    
                     return true;
                 } else {
                     throw new Error('Falha na inicialização');
@@ -1215,8 +1337,7 @@
             } catch (error) {
                 console.error('Erro ao inicializar Firebase:', error);
                 updateConnectionStatus(false, 'Erro de conexão');
-                firebaseStatus.textContent = 'Erro: ' + error.message;
-                showToast('Erro ao conectar com Firebase: ' + error.message, 'error');
+                showToast('Erro ao conectar com Firebase. Verifique sua conexão.', 'error');
                 return false;
             }
         }
@@ -1229,7 +1350,7 @@
                 updateCarregamentosTable();
                 updateDashboardStats();
                 updateEmpresasDatalist();
-                showToast('Carregamentos atualizados em tempo real!', 'info');
+                console.log('Carregamentos atualizados em tempo real:', carregamentos.length);
             });
 
             // Observar empresas
@@ -1237,7 +1358,7 @@
                 empresas = empresasFirebase;
                 updateEmpresasTable();
                 updateEmpresasDatalist();
-                showToast('Empresas atualizadas em tempo real!', 'info');
+                console.log('Empresas atualizadas em tempo real:', empresas.length);
             });
         }
 
@@ -1292,371 +1413,436 @@
             }
         }
 
-        // Restante do código JavaScript permanece igual, mas com integração Firebase
-        // [O restante do código JavaScript anterior é mantido aqui...]
+        // ===== NAVEGAÇÃO ENTRE PÁGINAS =====
+        function setupNavigation() {
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Remove active class from all links
+                    document.querySelectorAll('.nav-link').forEach(item => {
+                        item.classList.remove('active');
+                    });
+                    
+                    // Add active class to clicked link
+                    this.classList.add('active');
+                    
+                    // Hide all pages
+                    document.querySelectorAll('.page-content').forEach(page => {
+                        page.style.display = 'none';
+                    });
+                    
+                    // Show selected page
+                    const pageId = this.getAttribute('data-page') + '-page';
+                    document.getElementById(pageId).style.display = 'block';
+                    
+                    // Update page title
+                    const pageTitle = this.textContent.trim();
+                    document.querySelector('.page-title').textContent = pageTitle;
 
-        // Navigation between pages
-        document.querySelectorAll('.nav-link').forEach(link => {
-            link.addEventListener('click', function(e) {
+                    // Load specific page data
+                    if (pageId === 'agendamentos-page') {
+                        loadAgendamentos();
+                    } else if (pageId === 'dashboard-page') {
+                        updateDashboardStats();
+                        updateCarregamentosTable();
+                    }
+                });
+            });
+        }
+
+        // ===== MODAL FUNCTIONALITY =====
+        function setupModals() {
+            const carregamentoModal = document.getElementById('carregamento-modal');
+            const empresaModal = document.getElementById('empresa-modal');
+            const editarCarregamentoModal = document.getElementById('editar-carregamento-modal');
+            const closeBtns = document.querySelectorAll('.close-btn, .close-modal');
+            
+            // View carregamento details
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('btn-view') || e.target.closest('.btn-view')) {
+                    const btn = e.target.classList.contains('btn-view') ? e.target : e.target.closest('.btn-view');
+                    const carregamentoId = btn.getAttribute('data-id');
+                    const carregamento = carregamentos.find(c => c.id === carregamentoId);
+                    
+                    if (carregamento) {
+                        document.getElementById('detail-motorista').textContent = carregamento.motorista;
+                        document.getElementById('detail-empresa').textContent = carregamento.empresa;
+                        document.getElementById('detail-data').textContent = carregamento.data;
+                        document.getElementById('detail-transportadora').textContent = carregamento.transportadora;
+                        document.getElementById('detail-tipo').textContent = carregamento.tipo;
+                        document.getElementById('detail-documento').textContent = carregamento.documento;
+                        
+                        const statusElement = document.getElementById('detail-status');
+                        statusElement.textContent = carregamento.status;
+                        statusElement.className = 'status-badge ';
+                        
+                        if (carregamento.status === 'Pendente') {
+                            statusElement.classList.add('status-pending');
+                        } else if (carregamento.status === 'Em Andamento') {
+                            statusElement.classList.add('status-in-progress');
+                        } else {
+                            statusElement.classList.add('status-completed');
+                        }
+                        
+                        // Store current carregamento ID for editing
+                        currentCarregamentoId = carregamentoId;
+                        carregamentoModal.style.display = 'flex';
+                    }
+                }
+            });
+
+            // New empresa button
+            document.getElementById('btn-nova-empresa').addEventListener('click', function() {
+                empresaModal.style.display = 'flex';
+            });
+
+            // Edit carregamento buttons
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('btn-edit')) {
+                    const carregamentoId = e.target.getAttribute('data-id');
+                    const carregamento = carregamentos.find(c => c.id === carregamentoId);
+                    
+                    if (carregamento) {
+                        document.getElementById('edit-id').value = carregamento.id;
+                        document.getElementById('edit-motorista').value = carregamento.motorista;
+                        document.getElementById('edit-empresa').value = carregamento.empresa;
+                        
+                        // Format date for datetime-local input
+                        const [date, time] = carregamento.data.split(' ');
+                        const [day, month, year] = date.split('/');
+                        document.getElementById('edit-data-hora').value = `${year}-${month}-${day}T${time}`;
+                        
+                        document.getElementById('edit-transportadora').value = carregamento.transportadora;
+                        document.getElementById('edit-tipo-carregamento').value = carregamento.tipo;
+                        document.getElementById('edit-documento').value = carregamento.documento;
+                        document.getElementById('edit-status').value = carregamento.status;
+                        
+                        editarCarregamentoModal.style.display = 'flex';
+                    }
+                }
+                
+                // Delete carregamento buttons
+                if (e.target.classList.contains('btn-delete')) {
+                    const carregamentoId = e.target.getAttribute('data-id');
+                    if (confirm('Tem certeza que deseja excluir este carregamento?')) {
+                        excluirCarregamento(carregamentoId);
+                    }
+                }
+                
+                // Delete empresa buttons
+                if (e.target.classList.contains('btn-delete-empresa')) {
+                    const empresaId = e.target.getAttribute('data-id');
+                    if (confirm('Tem certeza que deseja excluir esta empresa?')) {
+                        excluirEmpresa(empresaId);
+                    }
+                }
+            });
+
+            // Close modals
+            closeBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    carregamentoModal.style.display = 'none';
+                    empresaModal.style.display = 'none';
+                    editarCarregamentoModal.style.display = 'none';
+                });
+            });
+            
+            window.addEventListener('click', function(e) {
+                if (e.target === carregamentoModal) {
+                    carregamentoModal.style.display = 'none';
+                }
+                if (e.target === empresaModal) {
+                    empresaModal.style.display = 'none';
+                }
+                if (e.target === editarCarregamentoModal) {
+                    editarCarregamentoModal.style.display = 'none';
+                }
+            });
+        }
+
+        // ===== FORM SUBMISSIONS =====
+        function setupForms() {
+            // Agendamento form
+            document.getElementById('agendamento-form').addEventListener('submit', async function(e) {
                 e.preventDefault();
                 
-                // Remove active class from all links
-                document.querySelectorAll('.nav-link').forEach(item => {
-                    item.classList.remove('active');
-                });
+                const btnCadastrar = document.getElementById('btn-cadastrar-text');
+                const btnLoading = document.getElementById('btn-cadastrar-loading');
                 
-                // Add active class to clicked link
-                this.classList.add('active');
+                btnCadastrar.style.display = 'none';
+                btnLoading.style.display = 'inline-block';
                 
-                // Hide all pages
-                document.querySelectorAll('.page-content').forEach(page => {
-                    page.style.display = 'none';
-                });
-                
-                // Show selected page
-                const pageId = this.getAttribute('data-page') + '-page';
-                document.getElementById(pageId).style.display = 'block';
-                
-                // Update page title
-                const pageTitle = this.textContent.trim();
-                document.querySelector('.page-title').textContent = pageTitle;
-
-                // Load specific page data
-                if (pageId === 'agendamentos-page') {
-                    loadAgendamentos();
-                } else if (pageId === 'dashboard-page') {
-                    updateDashboardStats();
-                    updateCarregamentosTable();
-                }
-            });
-        });
-
-        // Modal functionality
-        const carregamentoModal = document.getElementById('carregamento-modal');
-        const empresaModal = document.getElementById('empresa-modal');
-        const editarCarregamentoModal = document.getElementById('editar-carregamento-modal');
-        const closeBtns = document.querySelectorAll('.close-btn, .close-modal');
-        
-        // View carregamento details
-        document.addEventListener('click', function(e) {
-            if (e.target.classList.contains('btn-view') || e.target.closest('.btn-view')) {
-                const btn = e.target.classList.contains('btn-view') ? e.target : e.target.closest('.btn-view');
-                const carregamentoId = btn.getAttribute('data-id');
-                const carregamento = carregamentos.find(c => c.id === carregamentoId);
-                
-                if (carregamento) {
-                    document.getElementById('detail-motorista').textContent = carregamento.motorista;
-                    document.getElementById('detail-empresa').textContent = carregamento.empresa;
-                    document.getElementById('detail-data').textContent = carregamento.data;
-                    document.getElementById('detail-transportadora').textContent = carregamento.transportadora;
-                    document.getElementById('detail-tipo').textContent = carregamento.tipo;
-                    document.getElementById('detail-documento').textContent = carregamento.documento;
+                try {
+                    const novoCarregamento = {
+                        motorista: document.getElementById('motorista').value,
+                        empresa: document.getElementById('empresa').value,
+                        data: formatDateTime(document.getElementById('data-hora').value),
+                        transportadora: document.getElementById('transportadora').value,
+                        tipo: document.getElementById('tipo-carregamento').value,
+                        documento: document.getElementById('documento').value,
+                        status: 'Pendente'
+                    };
                     
-                    const statusElement = document.getElementById('detail-status');
-                    statusElement.textContent = carregamento.status;
-                    statusElement.className = 'status-badge ';
-                    
-                    if (carregamento.status === 'Pendente') {
-                        statusElement.classList.add('status-pending');
-                    } else if (carregamento.status === 'Em Andamento') {
-                        statusElement.classList.add('status-in-progress');
+                    if (firebaseManager.isInitialized && firebaseManager.isConnected) {
+                        await firebaseManager.salvarCarregamento(novoCarregamento);
                     } else {
-                        statusElement.classList.add('status-completed');
-                    }
-                    
-                    // Store current carregamento ID for editing
-                    currentCarregamentoId = carregamentoId;
-                    carregamentoModal.style.display = 'flex';
-                }
-            }
-        });
-
-        // New empresa button
-        document.getElementById('btn-nova-empresa').addEventListener('click', function() {
-            empresaModal.style.display = 'flex';
-        });
-
-        // Edit carregamento buttons
-        document.addEventListener('click', function(e) {
-            if (e.target.classList.contains('btn-edit')) {
-                const carregamentoId = e.target.getAttribute('data-id');
-                const carregamento = carregamentos.find(c => c.id === carregamentoId);
-                
-                if (carregamento) {
-                    document.getElementById('edit-id').value = carregamento.id;
-                    document.getElementById('edit-motorista').value = carregamento.motorista;
-                    document.getElementById('edit-empresa').value = carregamento.empresa;
-                    
-                    // Format date for datetime-local input
-                    const [date, time] = carregamento.data.split(' ');
-                    const [day, month, year] = date.split('/');
-                    document.getElementById('edit-data-hora').value = `${year}-${month}-${day}T${time}`;
-                    
-                    document.getElementById('edit-transportadora').value = carregamento.transportadora;
-                    document.getElementById('edit-tipo-carregamento').value = carregamento.tipo;
-                    document.getElementById('edit-documento').value = carregamento.documento;
-                    document.getElementById('edit-status').value = carregamento.status;
-                    
-                    editarCarregamentoModal.style.display = 'flex';
-                }
-            }
-            
-            // Delete carregamento buttons
-            if (e.target.classList.contains('btn-delete')) {
-                const carregamentoId = e.target.getAttribute('data-id');
-                if (confirm('Tem certeza que deseja excluir este carregamento?')) {
-                    excluirCarregamento(carregamentoId);
-                }
-            }
-            
-            // Delete empresa buttons
-            if (e.target.classList.contains('btn-delete-empresa')) {
-                const empresaId = e.target.getAttribute('data-id');
-                if (confirm('Tem certeza que deseja excluir esta empresa?')) {
-                    excluirEmpresa(empresaId);
-                }
-            }
-        });
-
-        // Funções para excluir com Firebase
-        async function excluirCarregamento(id) {
-            try {
-                if (firebaseManager.isInitialized) {
-                    await firebaseManager.excluirCarregamento(id);
-                } else {
-                    carregamentos = carregamentos.filter(c => c.id !== id);
-                    updateCarregamentosTable();
-                    updateDashboardStats();
-                    saveLocalData();
-                }
-                showToast('Carregamento excluído com sucesso!');
-            } catch (error) {
-                console.error('Erro ao excluir carregamento:', error);
-                showToast('Erro ao excluir carregamento: ' + error.message, 'error');
-            }
-        }
-
-        async function excluirEmpresa(id) {
-            try {
-                if (firebaseManager.isInitialized) {
-                    await firebaseManager.excluirEmpresa(id);
-                } else {
-                    empresas = empresas.filter(e => e.id !== id);
-                    updateEmpresasTable();
-                    saveLocalData();
-                }
-                showToast('Empresa excluída com sucesso!');
-            } catch (error) {
-                console.error('Erro ao excluir empresa:', error);
-                showToast('Erro ao excluir empresa: ' + error.message, 'error');
-            }
-        }
-
-        // Close modals
-        closeBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
-                carregamentoModal.style.display = 'none';
-                empresaModal.style.display = 'none';
-                editarCarregamentoModal.style.display = 'none';
-            });
-        });
-        
-        window.addEventListener('click', function(e) {
-            if (e.target === carregamentoModal) {
-                carregamentoModal.style.display = 'none';
-            }
-            if (e.target === empresaModal) {
-                empresaModal.style.display = 'none';
-            }
-            if (e.target === editarCarregamentoModal) {
-                editarCarregamentoModal.style.display = 'none';
-            }
-        });
-
-        // Form submissions
-        document.getElementById('agendamento-form').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const btnCadastrar = document.getElementById('btn-cadastrar-text');
-            const btnLoading = document.getElementById('btn-cadastrar-loading');
-            
-            btnCadastrar.style.display = 'none';
-            btnLoading.style.display = 'inline-block';
-            
-            try {
-                const novoCarregamento = {
-                    motorista: document.getElementById('motorista').value,
-                    empresa: document.getElementById('empresa').value,
-                    data: formatDateTime(document.getElementById('data-hora').value),
-                    transportadora: document.getElementById('transportadora').value,
-                    tipo: document.getElementById('tipo-carregamento').value,
-                    documento: document.getElementById('documento').value,
-                    status: 'Pendente'
-                };
-                
-                if (firebaseManager.isInitialized) {
-                    await firebaseManager.salvarCarregamento(novoCarregamento);
-                } else {
-                    novoCarregamento.id = Date.now().toString();
-                    novoCarregamento.criadoEm = new Date();
-                    carregamentos.push(novoCarregamento);
-                    updateCarregamentosTable();
-                    updateDashboardStats();
-                    saveLocalData();
-                }
-                
-                showToast('Agendamento cadastrado com sucesso!');
-                this.reset();
-            } catch (error) {
-                console.error('Erro ao cadastrar agendamento:', error);
-                showToast('Erro ao cadastrar agendamento: ' + error.message, 'error');
-            } finally {
-                btnCadastrar.style.display = 'inline-block';
-                btnLoading.style.display = 'none';
-            }
-        });
-        
-        document.getElementById('empresa-form').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            try {
-                const novaEmpresa = {
-                    nome: document.getElementById('empresa-nome').value,
-                    cnpj: document.getElementById('empresa-cnpj').value,
-                    responsavel: document.getElementById('empresa-responsavel').value,
-                    telefone: document.getElementById('empresa-telefone').value,
-                    email: document.getElementById('empresa-email').value,
-                    endereco: document.getElementById('empresa-endereco').value,
-                    visitas: 0,
-                    ultimaVisita: 'N/A'
-                };
-                
-                if (firebaseManager.isInitialized) {
-                    await firebaseManager.salvarEmpresa(novaEmpresa);
-                } else {
-                    novaEmpresa.id = Date.now().toString();
-                    novaEmpresa.criadoEm = new Date();
-                    empresas.push(novaEmpresa);
-                    updateEmpresasTable();
-                    saveLocalData();
-                }
-                
-                showToast('Empresa cadastrada com sucesso!');
-                this.reset();
-                empresaModal.style.display = 'none';
-            } catch (error) {
-                console.error('Erro ao cadastrar empresa:', error);
-                showToast('Erro ao cadastrar empresa: ' + error.message, 'error');
-            }
-        });
-        
-        document.getElementById('editar-carregamento-form').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            try {
-                const carregamentoId = document.getElementById('edit-id').value;
-                const dadosAtualizados = {
-                    motorista: document.getElementById('edit-motorista').value,
-                    empresa: document.getElementById('edit-empresa').value,
-                    data: formatDateTime(document.getElementById('edit-data-hora').value),
-                    transportadora: document.getElementById('edit-transportadora').value,
-                    tipo: document.getElementById('edit-tipo-carregamento').value,
-                    documento: document.getElementById('edit-documento').value,
-                    status: document.getElementById('edit-status').value
-                };
-                
-                if (firebaseManager.isInitialized) {
-                    await firebaseManager.atualizarCarregamento(carregamentoId, dadosAtualizados);
-                } else {
-                    const index = carregamentos.findIndex(c => c.id === carregamentoId);
-                    if (index !== -1) {
-                        carregamentos[index] = { ...carregamentos[index], ...dadosAtualizados };
+                        novoCarregamento.id = Date.now().toString();
+                        novoCarregamento.criadoEm = new Date();
+                        carregamentos.push(novoCarregamento);
                         updateCarregamentosTable();
                         updateDashboardStats();
                         saveLocalData();
                     }
-                }
-                
-                showToast('Carregamento atualizado com sucesso!');
-                editarCarregamentoModal.style.display = 'none';
-            } catch (error) {
-                console.error('Erro ao atualizar carregamento:', error);
-                showToast('Erro ao atualizar carregamento: ' + error.message, 'error');
-            }
-        });
-
-        // Change status button
-        document.getElementById('btn-alterar-status').addEventListener('click', async function() {
-            if (!currentCarregamentoId) return;
-            
-            const carregamento = carregamentos.find(c => c.id === currentCarregamentoId);
-            if (!carregamento) return;
-            
-            try {
-                let novoStatus;
-                if (carregamento.status === 'Pendente') {
-                    novoStatus = 'Em Andamento';
-                } else if (carregamento.status === 'Em Andamento') {
-                    novoStatus = 'Concluído';
-                } else {
-                    novoStatus = 'Pendente';
-                }
-                
-                if (firebaseManager.isInitialized) {
-                    await firebaseManager.atualizarCarregamento(currentCarregamentoId, { status: novoStatus });
-                } else {
-                    carregamento.status = novoStatus;
-                    updateCarregamentosTable();
-                    updateDashboardStats();
-                    saveLocalData();
                     
-                    // Update modal display
-                    const statusElement = document.getElementById('detail-status');
-                    statusElement.textContent = novoStatus;
-                    statusElement.className = 'status-badge ';
+                    showToast('Agendamento cadastrado com sucesso!');
+                    this.reset();
+                } catch (error) {
+                    console.error('Erro ao cadastrar agendamento:', error);
+                    showToast('Erro ao cadastrar agendamento: ' + error.message, 'error');
+                } finally {
+                    btnCadastrar.style.display = 'inline-block';
+                    btnLoading.style.display = 'none';
+                }
+            });
+            
+            // Empresa form
+            document.getElementById('empresa-form').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                try {
+                    const novaEmpresa = {
+                        nome: document.getElementById('empresa-nome').value,
+                        cnpj: document.getElementById('empresa-cnpj').value,
+                        responsavel: document.getElementById('empresa-responsavel').value,
+                        telefone: document.getElementById('empresa-telefone').value,
+                        email: document.getElementById('empresa-email').value,
+                        endereco: document.getElementById('empresa-endereco').value,
+                        visitas: 0,
+                        ultimaVisita: 'N/A'
+                    };
                     
-                    if (novoStatus === 'Pendente') {
-                        statusElement.classList.add('status-pending');
-                    } else if (novoStatus === 'Em Andamento') {
-                        statusElement.classList.add('status-in-progress');
+                    if (firebaseManager.isInitialized && firebaseManager.isConnected) {
+                        await firebaseManager.salvarEmpresa(novaEmpresa);
                     } else {
-                        statusElement.classList.add('status-completed');
+                        novaEmpresa.id = Date.now().toString();
+                        novaEmpresa.criadoEm = new Date();
+                        empresas.push(novaEmpresa);
+                        updateEmpresasTable();
+                        saveLocalData();
                     }
+                    
+                    showToast('Empresa cadastrada com sucesso!');
+                    this.reset();
+                    document.getElementById('empresa-modal').style.display = 'none';
+                } catch (error) {
+                    console.error('Erro ao cadastrar empresa:', error);
+                    showToast('Erro ao cadastrar empresa: ' + error.message, 'error');
                 }
+            });
+            
+            // Editar carregamento form
+            document.getElementById('editar-carregamento-form').addEventListener('submit', async function(e) {
+                e.preventDefault();
                 
-                showToast('Status alterado com sucesso!');
-            } catch (error) {
-                console.error('Erro ao alterar status:', error);
-                showToast('Erro ao alterar status: ' + error.message, 'error');
-            }
-        });
+                try {
+                    const carregamentoId = document.getElementById('edit-id').value;
+                    const dadosAtualizados = {
+                        motorista: document.getElementById('edit-motorista').value,
+                        empresa: document.getElementById('edit-empresa').value,
+                        data: formatDateTime(document.getElementById('edit-data-hora').value),
+                        transportadora: document.getElementById('edit-transportadora').value,
+                        tipo: document.getElementById('edit-tipo-carregamento').value,
+                        documento: document.getElementById('edit-documento').value,
+                        status: document.getElementById('edit-status').value
+                    };
+                    
+                    if (firebaseManager.isInitialized && firebaseManager.isConnected) {
+                        await firebaseManager.atualizarCarregamento(carregamentoId, dadosAtualizados);
+                    } else {
+                        const index = carregamentos.findIndex(c => c.id === carregamentoId);
+                        if (index !== -1) {
+                            carregamentos[index] = { ...carregamentos[index], ...dadosAtualizados };
+                            updateCarregamentosTable();
+                            updateDashboardStats();
+                            saveLocalData();
+                        }
+                    }
+                    
+                    showToast('Carregamento atualizado com sucesso!');
+                    document.getElementById('editar-carregamento-modal').style.display = 'none';
+                } catch (error) {
+                    console.error('Erro ao atualizar carregamento:', error);
+                    showToast('Erro ao atualizar carregamento: ' + error.message, 'error');
+                }
+            });
+        }
 
-        // Edit carregamento button in modal
-        document.getElementById('btn-editar-carregamento').addEventListener('click', function() {
-            if (!currentCarregamentoId) return;
-            
-            const carregamento = carregamentos.find(c => c.id === currentCarregamentoId);
-            if (!carregamento) return;
-            
-            document.getElementById('edit-id').value = carregamento.id;
-            document.getElementById('edit-motorista').value = carregamento.motorista;
-            document.getElementById('edit-empresa').value = carregamento.empresa;
-            
-            // Format date for datetime-local input
-            const [date, time] = carregamento.data.split(' ');
-            const [day, month, year] = date.split('/');
-            document.getElementById('edit-data-hora').value = `${year}-${month}-${day}T${time}`;
-            
-            document.getElementById('edit-transportadora').value = carregamento.transportadora;
-            document.getElementById('edit-tipo-carregamento').value = carregamento.tipo;
-            document.getElementById('edit-documento').value = carregamento.documento;
-            document.getElementById('edit-status').value = carregamento.status;
-            
-            carregamentoModal.style.display = 'none';
-            editarCarregamentoModal.style.display = 'flex';
-        });
+        // ===== BUTTON ACTIONS =====
+        function setupButtons() {
+            // Change status button
+            document.getElementById('btn-alterar-status').addEventListener('click', async function() {
+                if (!currentCarregamentoId) return;
+                
+                const carregamento = carregamentos.find(c => c.id === currentCarregamentoId);
+                if (!carregamento) return;
+                
+                try {
+                    let novoStatus;
+                    if (carregamento.status === 'Pendente') {
+                        novoStatus = 'Em Andamento';
+                    } else if (carregamento.status === 'Em Andamento') {
+                        novoStatus = 'Concluído';
+                    } else {
+                        novoStatus = 'Pendente';
+                    }
+                    
+                    if (firebaseManager.isInitialized && firebaseManager.isConnected) {
+                        await firebaseManager.atualizarCarregamento(currentCarregamentoId, { status: novoStatus });
+                    } else {
+                        carregamento.status = novoStatus;
+                        updateCarregamentosTable();
+                        updateDashboardStats();
+                        saveLocalData();
+                        
+                        // Update modal display
+                        const statusElement = document.getElementById('detail-status');
+                        statusElement.textContent = novoStatus;
+                        statusElement.className = 'status-badge ';
+                        
+                        if (novoStatus === 'Pendente') {
+                            statusElement.classList.add('status-pending');
+                        } else if (novoStatus === 'Em Andamento') {
+                            statusElement.classList.add('status-in-progress');
+                        } else {
+                            statusElement.classList.add('status-completed');
+                        }
+                    }
+                    
+                    showToast('Status alterado com sucesso!');
+                } catch (error) {
+                    console.error('Erro ao alterar status:', error);
+                    showToast('Erro ao alterar status: ' + error.message, 'error');
+                }
+            });
 
-        // Utility functions
+            // Edit carregamento button in modal
+            document.getElementById('btn-editar-carregamento').addEventListener('click', function() {
+                if (!currentCarregamentoId) return;
+                
+                const carregamento = carregamentos.find(c => c.id === currentCarregamentoId);
+                if (!carregamento) return;
+                
+                document.getElementById('edit-id').value = carregamento.id;
+                document.getElementById('edit-motorista').value = carregamento.motorista;
+                document.getElementById('edit-empresa').value = carregamento.empresa;
+                
+                // Format date for datetime-local input
+                const [date, time] = carregamento.data.split(' ');
+                const [day, month, year] = date.split('/');
+                document.getElementById('edit-data-hora').value = `${year}-${month}-${day}T${time}`;
+                
+                document.getElementById('edit-transportadora').value = carregamento.transportadora;
+                document.getElementById('edit-tipo-carregamento').value = carregamento.tipo;
+                document.getElementById('edit-documento').value = carregamento.documento;
+                document.getElementById('edit-status').value = carregamento.status;
+                
+                document.getElementById('carregamento-modal').style.display = 'none';
+                document.getElementById('editar-carregamento-modal').style.display = 'flex';
+            });
+
+            // Additional button functionalities
+            document.getElementById('btn-limpar-form').addEventListener('click', function() {
+                document.getElementById('agendamento-form').reset();
+                showToast('Formulário limpo!');
+            });
+
+            document.getElementById('btn-aplicar-filtro').addEventListener('click', function() {
+                updateDashboardStats();
+                updateCarregamentosTable();
+                showToast('Filtro aplicado com sucesso!');
+            });
+
+            document.getElementById('btn-limpar-filtros').addEventListener('click', function() {
+                document.getElementById('filter-date').value = '';
+                updateDashboardStats();
+                updateCarregamentosTable();
+                showToast('Filtro limpo!');
+            });
+
+            document.getElementById('btn-filtrar-agendamentos').addEventListener('click', function() {
+                loadAgendamentos();
+                showToast('Agendamentos filtrados!');
+            });
+
+            document.getElementById('btn-limpar-filtro-agendamentos').addEventListener('click', function() {
+                document.getElementById('agendamento-filter-date').value = '';
+                loadAgendamentos();
+                showToast('Filtro de agendamentos limpo!');
+            });
+
+            document.getElementById('btn-sincronizar').addEventListener('click', function() {
+                sincronizarDados();
+            });
+
+            document.getElementById('btn-sincronizar-tudo').addEventListener('click', function() {
+                sincronizarDados();
+            });
+
+            document.getElementById('btn-backup-dados').addEventListener('click', function() {
+                const backupData = {
+                    carregamentos: carregamentos,
+                    empresas: empresas,
+                    dataBackup: new Date().toISOString(),
+                    versao: '1.0'
+                };
+                
+                const dataStr = JSON.stringify(backupData, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `backup-carregamentos-${new Date().toISOString().split('T')[0]}.json`;
+                link.click();
+                
+                URL.revokeObjectURL(url);
+                showToast('Backup dos dados realizado com sucesso!');
+            });
+
+            document.getElementById('btn-limpar-dados').addEventListener('click', function() {
+                if (confirm('Tem certeza que deseja limpar TODOS os dados locais? Esta ação não pode ser desfeita.')) {
+                    localStorage.removeItem('carregamentos');
+                    localStorage.removeItem('empresas');
+                    carregamentos = [];
+                    empresas = [];
+                    updateCarregamentosTable();
+                    updateEmpresasTable();
+                    updateDashboardStats();
+                    showToast('Dados locais limpos com sucesso!', 'warning');
+                }
+            });
+
+            document.getElementById('btn-copiar-link').addEventListener('click', function() {
+                const linkInput = document.getElementById('link-externo');
+                linkInput.select();
+                document.execCommand('copy');
+                showToast('Link copiado para a área de transferência!');
+            });
+
+            document.getElementById('toggle-firebase').addEventListener('change', function() {
+                if (this.checked) {
+                    initializeFirebase();
+                } else {
+                    firebaseManager.pararObservadores();
+                    updateConnectionStatus(false, 'Firebase Desativado');
+                    firebaseStatus.textContent = 'Desativado';
+                    showToast('Firebase desativado. Modo offline ativo.', 'warning');
+                }
+            });
+        }
+
+        // ===== UTILITY FUNCTIONS =====
         function formatDateTime(dateTimeString) {
             const date = new Date(dateTimeString);
             const day = String(date.getDate()).padStart(2, '0');
@@ -1812,95 +1998,39 @@
             });
         }
 
-        // Additional button functionalities
-        document.getElementById('btn-limpar-form').addEventListener('click', function() {
-            document.getElementById('agendamento-form').reset();
-            showToast('Formulário limpo!');
-        });
-
-        document.getElementById('btn-aplicar-filtro').addEventListener('click', function() {
-            updateDashboardStats();
-            updateCarregamentosTable();
-            showToast('Filtro aplicado com sucesso!');
-        });
-
-        document.getElementById('btn-limpar-filtros').addEventListener('click', function() {
-            document.getElementById('filter-date').value = '';
-            updateDashboardStats();
-            updateCarregamentosTable();
-            showToast('Filtro limpo!');
-        });
-
-        document.getElementById('btn-filtrar-agendamentos').addEventListener('click', function() {
-            loadAgendamentos();
-            showToast('Agendamentos filtrados!');
-        });
-
-        document.getElementById('btn-limpar-filtro-agendamentos').addEventListener('click', function() {
-            document.getElementById('agendamento-filter-date').value = '';
-            loadAgendamentos();
-            showToast('Filtro de agendamentos limpo!');
-        });
-
-        document.getElementById('btn-sincronizar').addEventListener('click', function() {
-            sincronizarDados();
-        });
-
-        document.getElementById('btn-sincronizar-tudo').addEventListener('click', function() {
-            sincronizarDados();
-        });
-
-        document.getElementById('btn-backup-dados').addEventListener('click', function() {
-            const backupData = {
-                carregamentos: carregamentos,
-                empresas: empresas,
-                dataBackup: new Date().toISOString(),
-                versao: '1.0'
-            };
-            
-            const dataStr = JSON.stringify(backupData, null, 2);
-            const dataBlob = new Blob([dataStr], {type: 'application/json'});
-            
-            const url = URL.createObjectURL(dataBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `backup-carregamentos-${new Date().toISOString().split('T')[0]}.json`;
-            link.click();
-            
-            URL.revokeObjectURL(url);
-            showToast('Backup dos dados realizado com sucesso!');
-        });
-
-        document.getElementById('btn-limpar-dados').addEventListener('click', function() {
-            if (confirm('Tem certeza que deseja limpar TODOS os dados locais? Esta ação não pode ser desfeita.')) {
-                localStorage.removeItem('carregamentos');
-                localStorage.removeItem('empresas');
-                carregamentos = [];
-                empresas = [];
-                updateCarregamentosTable();
-                updateEmpresasTable();
-                updateDashboardStats();
-                showToast('Dados locais limpos com sucesso!', 'warning');
+        // Funções para excluir com Firebase
+        async function excluirCarregamento(id) {
+            try {
+                if (firebaseManager.isInitialized && firebaseManager.isConnected) {
+                    await firebaseManager.excluirCarregamento(id);
+                } else {
+                    carregamentos = carregamentos.filter(c => c.id !== id);
+                    updateCarregamentosTable();
+                    updateDashboardStats();
+                    saveLocalData();
+                }
+                showToast('Carregamento excluído com sucesso!');
+            } catch (error) {
+                console.error('Erro ao excluir carregamento:', error);
+                showToast('Erro ao excluir carregamento: ' + error.message, 'error');
             }
-        });
+        }
 
-        document.getElementById('btn-copiar-link').addEventListener('click', function() {
-            const linkInput = document.getElementById('link-externo');
-            linkInput.select();
-            document.execCommand('copy');
-            showToast('Link copiado para a área de transferência!');
-        });
-
-        document.getElementById('toggle-firebase').addEventListener('change', function() {
-            if (this.checked) {
-                initializeFirebase();
-            } else {
-                firebaseManager.pararObservadores();
-                updateConnectionStatus(false, 'Firebase Desativado');
-                firebaseStatus.textContent = 'Desativado';
-                showToast('Firebase desativado. Modo offline ativo.', 'warning');
+        async function excluirEmpresa(id) {
+            try {
+                if (firebaseManager.isInitialized && firebaseManager.isConnected) {
+                    await firebaseManager.excluirEmpresa(id);
+                } else {
+                    empresas = empresas.filter(e => e.id !== id);
+                    updateEmpresasTable();
+                    saveLocalData();
+                }
+                showToast('Empresa excluída com sucesso!');
+            } catch (error) {
+                console.error('Erro ao excluir empresa:', error);
+                showToast('Erro ao excluir empresa: ' + error.message, 'error');
             }
-        });
+        }
 
         // Initialize the app
         async function initializeApp() {
@@ -1908,17 +2038,25 @@
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('filter-date').value = today;
             
+            // Configurar todas as funcionalidades
+            setupNavigation();
+            setupModals();
+            setupForms();
+            setupButtons();
+            
             // Carregar dados locais primeiro
             loadLocalData();
             
-            // Inicializar Firebase
-            await initializeFirebase();
+            // Inicializar Firebase (não bloquear a interface)
+            initializeFirebase();
             
-            // Atualizar interface
+            // Atualizar interface com dados locais
             updateCarregamentosTable();
             updateEmpresasTable();
             updateDashboardStats();
             updateEmpresasDatalist();
+            
+            console.log('Sistema inicializado com sucesso!');
         }
 
         // Inicializar quando a página carregar
