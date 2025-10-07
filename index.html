@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carregamentos Manager - Sistema de Gestão</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-black: #121212;
+            --secondary-black: #1e1e1e;
+            --accent-yellow: #ffd700;
+            --accent-yellow-dark: #e6c200;
+            --text-light: #f5f5f5;
+            --text-gray: #b0b0b0;
+            --success: #4caf50;
+            --warning: #ff9800;
+            --danger: #f44336;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: var(--primary-black);
+            color: var(--text-light);
+            min-height: 100vh;
+        }
+        
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        /* Sidebar Styles */
+        .sidebar {
+            width: 250px;
+            background-color: var(--secondary-black);
+            padding: 20px 0;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            padding: 0 20px 20px;
+            border-bottom: 1px solid #333;
+            margin-bottom: 20px;
+        }
+        
+        .logo-icon {
+            color: var(--accent-yellow);
+            font-size: 24px;
+            margin-right: 10px;
+        }
+        
+        .logo-text {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .nav-menu {
+            list-style: none;
+        }
+        
+        .nav-item {
+            margin-bottom: 5px;
+        }
+        
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: var(--text-light);
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            background-color: rgba(255, 215, 0, 0.1);
+            border-left: 3px solid var(--accent-yellow);
+            color: var(--accent-yellow);
+        }
+        
+        .nav-icon {
+            margin-right: 10px;
+            font-size: 18px;
+        }
+        
+        /* Main Content Styles */
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #333;
+        }
+        
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: var(--accent-yellow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            color: var(--primary-black);
+            font-weight: bold;
+        }
+        
+        /* Card Styles */
+        .card {
+            background-color: var(--secondary-black);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        /* Status Badges */
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-pending {
+            background-color: rgba(255, 152, 0, 0.2);
+            color: var(--warning);
+        }
+        
+        .status-in-progress {
+            background-color: rgba(33, 150, 243, 0.2);
+            color: #2196f3;
+        }
+        
+        .status-completed {
+            background-color: rgba(76, 175, 80, 0.2);
+            color: var(--success);
+        }
+        
+        /* Button Styles */
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background-color: var(--accent-yellow);
+            color: var(--primary-black);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--accent-yellow-dark);
+        }
+        
+        .btn-secondary {
+            background-color: #333;
+            color: var(--text-light);
+        }
+        
+        .btn-secondary:hover {
+            background-color: #444;
+        }
+        
+        .btn-danger {
+            background-color: var(--danger);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background-color: #d32f2f;
+        }
+        
+        /* Table Styles */
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .table th, .table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+        
+        .table th {
+            background-color: rgba(255, 215, 0, 0.1);
+            color: var(--accent-yellow);
+            font-weight: 600;
+        }
+        
+        .table tr:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .action-btn {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .btn-view {
+            background: none;
+            border: none;
+            color: var(--accent-yellow);
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            background-color: #333;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: var(--text-light);
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: var(--accent-yellow);
+        }
+        
+        /* Dashboard Stats */
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background-color: var(--secondary-black);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 10px 0;
+            color: var(--accent-yellow);
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-gray);
+        }
+        
+        /* Filter Section */
+        .filter-section {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background-color: var(--secondary-black);
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-light);
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: flex-end;
+        }
+        
+        .carregamento-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .detail-item {
+            margin-bottom: 10px;
+        }
+        
+        .detail-label {
+            font-weight: bold;
+            color: var(--accent-yellow);
+        }
+        
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: var(--accent-yellow);
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background-color: var(--success);
+            color: white;
+            border-radius: 4px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1100;
+            display: none;
+        }
+        
+        .toast.error {
+            background-color: var(--danger);
+        }
+        
+        .toast.warning {
+            background-color: var(--warning);
+        }
+        
+        /* Credits */
+        .credits {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #333;
+            color: var(--text-gray);
+            font-size: 14px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .app-container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+            }
+            
+            .stats-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .carregamento-details {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">🚚</div>
+                <div class="logo-text">Carregamentos Manager</div>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="#" class="nav-link active" data-page="dashboard">
+                        <span class="nav-icon">📊</span>
+                        Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-page="agendamentos">
+                        <span class="nav-icon">📅</span>
+                        Agendamentos
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-page="cadastro">
+                        <span class="nav-icon">➕</span>
+                        Cadastrar Agendamento
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-page="empresas">
+                        <span class="nav-icon">🏢</span>
+                        Empresas
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-page="configuracoes">
+                        <span class="nav-icon">⚙️</span>
+                        Configurações
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <h1 class="page-title">Dashboard</h1>
+                <div class="user-info">
+                    <div class="user-avatar">AG</div>
+                    <span>Aldemir Garbino</span>
+                </div>
+            </header>
+
+            <!-- Dashboard Page -->
+            <div id="dashboard-page" class="page-content">
+                <!-- Stats Overview -->
+                <div class="stats-container">
+                    <div class="stat-card">
+                        <div class="stat-label">Total de Carregamentos (Hoje)</div>
+                        <div class="stat-value" id="stat-total">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Em Andamento (Hoje)</div>
+                        <div class="stat-value" id="stat-andamento">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Pendentes (Hoje)</div>
+                        <div class="stat-value" id="stat-pendentes">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Concluídos (Hoje)</div>
+                        <div class="stat-value" id="stat-concluidos">0</div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="filter-section">
+                    <label class="form-label">Data:</label>
+                    <input type="date" class="form-control" style="width: auto;" id="filter-date" value="">
+                    <button class="btn btn-primary" id="btn-aplicar-filtro">Aplicar Filtro</button>
+                    <button class="btn btn-secondary" id="btn-limpar-filtros">Limpar Filtro</button>
+                </div>
+
+                <!-- Carregamentos Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Carregamentos do Dia</h2>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Motorista</th>
+                                <th>Empresa</th>
+                                <th>Data e Hora</th>
+                                <th>Transportadora</th>
+                                <th>Tipo de Carregamento</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="carregamentos-table-body">
+                            <!-- Carregamentos serão carregados aqui -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Credits -->
+                <div class="credits">
+                    Desenvolvido por Aldemir Garbino com assistência de IA
+                </div>
+            </div>
+
+            <!-- Other Pages (initially hidden) -->
+            <div id="agendamentos-page" class="page-content" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Agendamentos</h2>
+                    </div>
+                    <div class="filter-section">
+                        <label class="form-label">Data:</label>
+                        <input type="date" class="form-control" style="width: auto;" id="agendamento-filter-date">
+                        <button class="btn btn-primary" id="btn-filtrar-agendamentos">Filtrar</button>
+                        <button class="btn btn-secondary" id="btn-limpar-filtro-agendamentos">Limpar Filtro</button>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Motorista</th>
+                                <th>Empresa</th>
+                                <th>Data e Hora</th>
+                                <th>Transportadora</th>
+                                <th>Tipo de Carregamento</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="agendamentos-table-body">
+                            <!-- Agendamentos serão carregados aqui -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Credits -->
+                <div class="credits">
+                    Desenvolvido por Aldemir Garbino com assistência de IA
+                </div>
+            </div>
+
+            <div id="cadastro-page" class="page-content" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Cadastrar Novo Agendamento</h2>
+                    </div>
+                    <form id="agendamento-form">
+                        <div class="form-group">
+                            <label class="form-label" for="motorista">Motorista</label>
+                            <input type="text" class="form-control" id="motorista" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="empresa">Empresa</label>
+                            <input type="text" class="form-control" id="empresa" list="empresas-list" required>
+                            <datalist id="empresas-list">
+                                <option value="Empresa A Ltda">
+                                <option value="Empresa B S/A">
+                                <option value="Empresa C Ltda">
+                                <option value="Empresa D Comércio">
+                            </datalist>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="data-hora">Data e Hora</label>
+                            <input type="datetime-local" class="form-control" id="data-hora" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="transportadora">Transportadora</label>
+                            <input type="text" class="form-control" id="transportadora" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="tipo-carregamento">Tipo de Carregamento</label>
+                            <input type="text" class="form-control" id="tipo-carregamento" list="tipos-carregamento" required>
+                            <datalist id="tipos-carregamento">
+                                <option value="Carga Seca">
+                                <option value="Carga Refrigerada">
+                                <option value="Carga Perigosa">
+                                <option value="Carga Frágil">
+                                <option value="Carga Viva">
+                                <option value="Carga a Granel">
+                            </datalist>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="documento">Documento do Motorista</label>
+                            <input type="text" class="form-control" id="documento" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Cadastrar Agendamento</button>
+                        <button type="button" class="btn btn-secondary" id="btn-limpar-form">Limpar Formulário</button>
+                    </form>
+                </div>
+
+                <!-- Credits -->
+                <div class="credits">
+                    Desenvolvido por Aldemir Garbino com assistência de IA
+                </div>
+            </div>
+
+            <div id="empresas-page" class="page-content" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Empresas Cadastradas</h2>
+                        <button class="btn btn-primary" id="btn-nova-empresa">Nova Empresa</button>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>CNPJ</th>
+                                <th>Responsável</th>
+                                <th>Total de Visitas</th>
+                                <th>Última Visita</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="empresas-table-body">
+                            <!-- Empresas serão carregadas aqui -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Credits -->
+                <div class="credits">
+                    Desenvolvido por Aldemir Garbino com assistência de IA
+                </div>
+            </div>
+
+            <div id="configuracoes-page" class="page-content" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Configurações do Sistema</h2>
+                    </div>
+                    
+                    <!-- Configurações do Firebase -->
+                    <div class="form-group">
+                        <h3 style="margin-bottom: 15px; color: var(--accent-yellow);">Configurações do Firebase</h3>
+                        
+                        <div class="toggle-label">
+                            <span>Armazenamento Online (Firebase)</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="toggle-firebase">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div id="firebase-config" style="display: none; margin-top: 15px; padding: 15px; background-color: #2a2a2a; border-radius: 4px;">
+                            <div class="form-group">
+                                <label class="form-label" for="firebase-apiKey">API Key</label>
+                                <input type="text" class="form-control" id="firebase-apiKey" placeholder="Sua chave API do Firebase">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="firebase-authDomain">Auth Domain</label>
+                                <input type="text" class="form-control" id="firebase-authDomain" placeholder="seu-projeto.firebaseapp.com">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="firebase-projectId">Project ID</label>
+                                <input type="text" class="form-control" id="firebase-projectId" placeholder="seu-projeto-id">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="firebase-storageBucket">Storage Bucket</label>
+                                <input type="text" class="form-control" id="firebase-storageBucket" placeholder="seu-projeto.appspot.com">
+                            </div>
+                            <button class="btn btn-primary" id="btn-salvar-firebase">Salvar Configuração Firebase</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Gestão de Usuários</label>
+                        <div>
+                            <button class="btn btn-primary" id="btn-adicionar-usuario">Adicionar Usuário</button>
+                            <button class="btn btn-secondary" id="btn-listar-usuarios">Listar Usuários</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Exportação de Relatórios</label>
+                        <div>
+                            <button class="btn btn-secondary" id="btn-exportar-excel">Exportar Excel</button>
+                            <button class="btn btn-secondary" id="btn-exportar-pdf">Exportar PDF</button>
+                            <button class="btn btn-secondary" id="btn-configurar-relatorios">Configurar Relatórios</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Monitoramento de Acessos</label>
+                        <div>
+                            <button class="btn btn-primary" id="btn-visualizar-acessos">Visualizar Acessos</button>
+                            <button class="btn btn-secondary" id="btn-configurar-monitoramento">Configurar Monitoramento</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Link de Agendamento Externo</label>
+                        <div>
+                            <input type="text" class="form-control" value="https://carregamentos.com/agendamento-externo" readonly id="link-externo">
+                            <button class="btn btn-secondary" style="margin-top: 10px;" id="btn-copiar-link">Copiar Link</button>
+                            <button class="btn btn-primary" style="margin-top: 10px;" id="btn-gerar-novo-link">Gerar Novo Link</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Configurações Gerais</label>
+                        <div>
+                            <button class="btn btn-primary" id="btn-backup-dados">Backup de Dados</button>
+                            <button class="btn btn-secondary" id="btn-restaurar-dados">Restaurar Dados</button>
+                            <button class="btn btn-danger" id="btn-limpar-dados">Limpar Todos os Dados</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Credits -->
+                <div class="credits">
+                    Desenvolvido por Aldemir Garbino com assistência de IA
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for Viewing Carregamento -->
+    <div id="carregamento-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Detalhes do Carregamento</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="carregamento-details">
+                    <div class="detail-item">
+                        <span class="detail-label">Motorista:</span>
+                        <span id="detail-motorista">João Silva</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Empresa:</span>
+                        <span id="detail-empresa">Empresa A Ltda</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Data e Hora:</span>
+                        <span id="detail-data">15/10/2023 09:00</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Transportadora:</span>
+                        <span id="detail-transportadora">Transportadora X</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Tipo de Carregamento:</span>
+                        <span id="detail-tipo">Carga Seca</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Documento do Motorista:</span>
+                        <span id="detail-documento">123.456.789-00</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Status:</span>
+                        <span id="detail-status" class="status-badge status-in-progress">Em Andamento</span>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" id="btn-alterar-status">Alterar Status</button>
+                    <button class="btn btn-secondary" id="btn-editar-carregamento">Editar</button>
+                    <button class="btn btn-secondary close-modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Nova Empresa -->
+    <div id="empresa-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Cadastrar Nova Empresa</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="empresa-form">
+                    <div class="form-group">
+                        <label class="form-label" for="empresa-nome">Nome da Empresa</label>
+                        <input type="text" class="form-control" id="empresa-nome" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="empresa-cnpj">CNPJ</label>
+                        <input type="text" class="form-control" id="empresa-cnpj" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="empresa-responsavel">Responsável</label>
+                        <input type="text" class="form-control" id="empresa-responsavel" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="empresa-telefone">Telefone</label>
+                        <input type="text" class="form-control" id="empresa-telefone" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="empresa-email">E-mail</label>
+                        <input type="email" class="form-control" id="empresa-email" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="empresa-endereco">Endereço</label>
+                        <textarea class="form-control" id="empresa-endereco" rows="3"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="submit" class="btn btn-primary">Cadastrar Empresa</button>
+                        <button type="button" class="btn btn-secondary close-modal">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Editar Carregamento -->
+    <div id="editar-carregamento-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Editar Carregamento</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editar-carregamento-form">
+                    <input type="hidden" id="edit-id">
+                    <div class="form-group">
+                        <label class="form-label" for="edit-motorista">Motorista</label>
+                        <input type="text" class="form-control" id="edit-motorista" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-empresa">Empresa</label>
+                        <input type="text" class="form-control" id="edit-empresa" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-data-hora">Data e Hora</label>
+                        <input type="datetime-local" class="form-control" id="edit-data-hora" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-transportadora">Transportadora</label>
+                        <input type="text" class="form-control" id="edit-transportadora" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-tipo-carregamento">Tipo de Carregamento</label>
+                        <input type="text" class="form-control" id="edit-tipo-carregamento" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-documento">Documento do Motorista</label>
+                        <input type="text" class="form-control" id="edit-documento" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-status">Status</label>
+                        <select class="form-control" id="edit-status" required>
+                            <option value="Pendente">Pendente</option>
+                            <option value="Em Andamento">Em Andamento</option>
+                            <option value="Concluído">Concluído</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                        <button type="button" class="btn btn-secondary close-modal">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Data storage
+        let carregamentos = JSON.parse(localStorage.getItem('carregamentos')) || [
+            { id: 1, motorista: "João Silva", empresa: "Empresa A Ltda", data: "15/10/2023 09:00", transportadora: "Transportadora X", tipo: "Carga Seca", documento: "123.456.789-00", status: "Em Andamento" },
+            { id: 2, motorista: "Maria Santos", empresa: "Empresa B S/A", data: "16/10/2023 14:30", transportadora: "Transportadora Y", tipo: "Carga Refrigerada", documento: "987.654.321-00", status: "Pendente" },
+            { id: 3, motorista: "Pedro Oliveira", empresa: "Empresa C Ltda", data: "14/10/2023 11:15", transportadora: "Transportadora Z", tipo: "Carga Seca", documento: "456.789.123-00", status: "Concluído" }
+        ];
+
+        let empresas = JSON.parse(localStorage.getItem('empresas')) || [
+            { id: 1, nome: "Empresa A Ltda", cnpj: "12.345.678/0001-90", responsavel: "Carlos Mendes", telefone: "(11) 9999-8888", email: "contato@empresaa.com", endereco: "Rua A, 123 - São Paulo, SP", visitas: 15, ultimaVisita: "15/10/2023" },
+            { id: 2, nome: "Empresa B S/A", cnpj: "98.765.432/0001-10", responsavel: "Ana Rodrigues", telefone: "(11) 7777-6666", email: "contato@empresab.com", endereco: "Av. B, 456 - Rio de Janeiro, RJ", visitas: 8, ultimaVisita: "10/10/2023" }
+        ];
+
+        // Configurações
+        let config = JSON.parse(localStorage.getItem('config')) || {
+            firebaseEnabled: false,
+            firebaseConfig: {}
+        };
+
+        // Navigation between pages
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Remove active class from all links
+                document.querySelectorAll('.nav-link').forEach(item => {
+                    item.classList.remove('active');
+                });
+                
+                // Add active class to clicked link
+                this.classList.add('active');
+                
+                // Hide all pages
+                document.querySelectorAll('.page-content').forEach(page => {
+                    page.style.display = 'none';
+                });
+                
+                // Show selected page
+                const pageId = this.getAttribute('data-page') + '-page';
+                document.getElementById(pageId).style.display = 'block';
+                
+                // Update page title
+                const pageTitle = this.textContent.trim();
+                document.querySelector('.page-title').textContent = pageTitle;
+
+                // Load specific page data
+                if (pageId === 'agendamentos-page') {
+                    loadAgendamentos();
+                } else if (pageId === 'dashboard-page') {
+                    updateDashboardStats();
+                    updateCarregamentosTable();
+                } else if (pageId === 'configuracoes-page') {
+                    loadConfiguracoes();
+                }
+            });
+        });
+
+        // Modal functionality
+        const carregamentoModal = document.getElementById('carregamento-modal');
+        const empresaModal = document.getElementById('empresa-modal');
+        const editarCarregamentoModal = document.getElementById('editar-carregamento-modal');
+        const closeBtns = document.querySelectorAll('.close-btn, .close-modal');
+        const toast = document.getElementById('toast');
+        
+        // Show toast notification
+        function showToast(message, type = 'success') {
+            toast.textContent = message;
+            toast.className = 'toast';
+            if (type !== 'success') {
+                toast.classList.add(type);
+            }
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        // Save data to localStorage
+        function saveData() {
+            localStorage.setItem('carregamentos', JSON.stringify(carregamentos));
+            localStorage.setItem('empresas', JSON.stringify(empresas));
+            localStorage.setItem('config', JSON.stringify(config));
+        }
+
+        // Update dashboard stats
+        function updateDashboardStats() {
+            const selectedDate = document.getElementById('filter-date').value;
+            let filteredCarregamentos = carregamentos;
+            
+            if (selectedDate) {
+                filteredCarregamentos = carregamentos.filter(c => {
+                    const carregamentoDate = c.data.split(' ')[0];
+                    const filterDate = formatDateForDisplay(selectedDate);
+                    return carregamentoDate === filterDate;
+                });
+            }
+            
+            const total = filteredCarregamentos.length;
+            const andamento = filteredCarregamentos.filter(c => c.status === 'Em Andamento').length;
+            const pendentes = filteredCarregamentos.filter(c => c.status === 'Pendente').length;
+            const concluidos = filteredCarregamentos.filter(c => c.status === 'Concluído').length;
+            
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-andamento').textContent = andamento;
+            document.getElementById('stat-pendentes').textContent = pendentes;
+            document.getElementById('stat-concluidos').textContent = concluidos;
+        }
+
+        // Format date for display (DD/MM/YYYY)
+        function formatDateForDisplay(dateString) {
+            const date = new Date(dateString);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+
+        // View carregamento details
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-view') || e.target.closest('.btn-view')) {
+                const btn = e.target.classList.contains('btn-view') ? e.target : e.target.closest('.btn-view');
+                const carregamentoId = parseInt(btn.getAttribute('data-id'));
+                const carregamento = carregamentos.find(c => c.id === carregamentoId);
+                
+                if (carregamento) {
+                    document.getElementById('detail-motorista').textContent = carregamento.motorista;
+                    document.getElementById('detail-empresa').textContent = carregamento.empresa;
+                    document.getElementById('detail-data').textContent = carregamento.data;
+                    document.getElementById('detail-transportadora').textContent = carregamento.transportadora;
+                    document.getElementById('detail-tipo').textContent = carregamento.tipo;
+                    document.getElementById('detail-documento').textContent = carregamento.documento;
+                    
+                    const statusElement = document.getElementById('detail-status');
+                    statusElement.textContent = carregamento.status;
+                    statusElement.className = 'status-badge ';
+                    
+                    if (carregamento.status === 'Pendente') {
+                        statusElement.classList.add('status-pending');
+                    } else if (carregamento.status === 'Em Andamento') {
+                        statusElement.classList.add('status-in-progress');
+                    } else {
+                        statusElement.classList.add('status-completed');
+                    }
+                    
+                    // Store current carregamento ID for editing
+                    carregamentoModal.setAttribute('data-current-id', carregamentoId);
+                    carregamentoModal.style.display = 'flex';
+                }
+            }
+        });
+
+        // New empresa button
+        document.getElementById('btn-nova-empresa').addEventListener('click', function() {
+            empresaModal.style.display = 'flex';
+        });
+
+        // Edit carregamento buttons
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-edit')) {
+                const carregamentoId = parseInt(e.target.getAttribute('data-id'));
+                const carregamento = carregamentos.find(c => c.id === carregamentoId);
+                
+                if (carregamento) {
+                    document.getElementById('edit-id').value = carregamento.id;
+                    document.getElementById('edit-motorista').value = carregamento.motorista;
+                    document.getElementById('edit-empresa').value = carregamento.empresa;
+                    
+                    // Format date for datetime-local input
+                    const [date, time] = carregamento.data.split(' ');
+                    const [day, month, year] = date.split('/');
+                    document.getElementById('edit-data-hora').value = `${year}-${month}-${day}T${time}`;
+                    
+                    document.getElementById('edit-transportadora').value = carregamento.transportadora;
+                    document.getElementById('edit-tipo-carregamento').value = carregamento.tipo;
+                    document.getElementById('edit-documento').value = carregamento.documento;
+                    document.getElementById('edit-status').value = carregamento.status;
+                    
+                    editarCarregamentoModal.style.display = 'flex';
+                }
+            }
+            
+            // Delete carregamento buttons
+            if (e.target.classList.contains('btn-delete')) {
+                const carregamentoId = parseInt(e.target.getAttribute('data-id'));
+                if (confirm('Tem certeza que deseja excluir este carregamento?')) {
+                    carregamentos = carregamentos.filter(c => c.id !== carregamentoId);
+                    updateCarregamentosTable();
+                    updateDashboardStats();
+                    saveData();
+                    showToast('Carregamento excluído com sucesso!');
+                }
+            }
+            
+            // Edit empresa buttons
+            if (e.target.classList.contains('btn-edit-empresa')) {
+                const empresaId = parseInt(e.target.getAttribute('data-id'));
+                showToast(`Funcionalidade de editar empresa ${empresaId} será implementada!`, 'warning');
+            }
+            
+            // Delete empresa buttons
+            if (e.target.classList.contains('btn-delete-empresa')) {
+                const empresaId = parseInt(e.target.getAttribute('data-id'));
+                if (confirm('Tem certeza que deseja excluir esta empresa?')) {
+                    empresas = empresas.filter(e => e.id !== empresaId);
+                    updateEmpresasTable();
+                    saveData();
+                    showToast('Empresa excluída com sucesso!');
+                }
+            }
+        });
+
+        // Close modals
+        closeBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                carregamentoModal.style.display = 'none';
+                empresaModal.style.display = 'none';
+                editarCarregamentoModal.style.display = 'none';
+            });
+        });
+        
+        window.addEventListener('click', function(e) {
+            if (e.target === carregamentoModal) {
+                carregamentoModal.style.display = 'none';
+            }
+            if (e.target === empresaModal) {
+                empresaModal.style.display = 'none';
+            }
+            if (e.target === editarCarregamentoModal) {
+                editarCarregamentoModal.style.display = 'none';
+            }
+        });
+
+        // Form submissions
+        document.getElementById('agendamento-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const novoCarregamento = {
+                id: carregamentos.length > 0 ? Math.max(...carregamentos.map(c => c.id)) + 1 : 1,
+                motorista: document.getElementById('motorista').value,
+                empresa: document.getElementById('empresa').value,
+                data: formatDateTime(document.getElementById('data-hora').value),
+                transportadora: document.getElementById('transportadora').value,
+                tipo: document.getElementById('tipo-carregamento').value,
+                documento: document.getElementById('documento').value,
+                status: 'Pendente'
+            };
+            
+            carregamentos.push(novoCarregamento);
+            updateCarregamentosTable();
+            updateDashboardStats();
+            saveData();
+            showToast('Agendamento cadastrado com sucesso!');
+            this.reset();
+        });
+        
+        document.getElementById('empresa-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const novaEmpresa = {
+                id: empresas.length > 0 ? Math.max(...empresas.map(e => e.id)) + 1 : 1,
+                nome: document.getElementById('empresa-nome').value,
+                cnpj: document.getElementById('empresa-cnpj').value,
+                responsavel: document.getElementById('empresa-responsavel').value,
+                telefone: document.getElementById('empresa-telefone').value,
+                email: document.getElementById('empresa-email').value,
+                endereco: document.getElementById('empresa-endereco').value,
+                visitas: 0,
+                ultimaVisita: 'N/A'
+            };
+            
+            empresas.push(novaEmpresa);
+            updateEmpresasTable();
+            saveData();
+            showToast('Empresa cadastrada com sucesso!');
+            this.reset();
+            empresaModal.style.display = 'none';
+        });
+        
+        document.getElementById('editar-carregamento-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const carregamentoId = parseInt(document.getElementById('edit-id').value);
+            const carregamentoIndex = carregamentos.findIndex(c => c.id === carregamentoId);
+            
+            if (carregamentoIndex !== -1) {
+                carregamentos[carregamentoIndex] = {
+                    ...carregamentos[carregamentoIndex],
+                    motorista: document.getElementById('edit-motorista').value,
+                    empresa: document.getElementById('edit-empresa').value,
+                    data: formatDateTime(document.getElementById('edit-data-hora').value),
+                    transportadora: document.getElementById('edit-transportadora').value,
+                    tipo: document.getElementById('edit-tipo-carregamento').value,
+                    documento: document.getElementById('edit-documento').value,
+                    status: document.getElementById('edit-status').value
+                };
+                
+                updateCarregamentosTable();
+                updateDashboardStats();
+                saveData();
+                showToast('Carregamento atualizado com sucesso!');
+                editarCarregamentoModal.style.display = 'none';
+            }
+        });
+
+        // Change status button
+        document.getElementById('btn-alterar-status').addEventListener('click', function() {
+            const carregamentoId = parseInt(carregamentoModal.getAttribute('data-current-id'));
+            const carregamento = carregamentos.find(c => c.id === carregamentoId);
+            
+            if (carregamento) {
+                if (carregamento.status === 'Pendente') {
+                    carregamento.status = 'Em Andamento';
+                } else if (carregamento.status === 'Em Andamento') {
+                    carregamento.status = 'Concluído';
+                } else {
+                    carregamento.status = 'Pendente';
+                }
+                
+                updateCarregamentosTable();
+                updateDashboardStats();
+                saveData();
+                showToast('Status alterado com sucesso!');
+                
+                // Update modal display
+                const statusElement = document.getElementById('detail-status');
+                statusElement.textContent = carregamento.status;
+                statusElement.className = 'status-badge ';
+                
+                if (carregamento.status === 'Pendente') {
+                    statusElement.classList.add('status-pending');
+                } else if (carregamento.status === 'Em Andamento') {
+                    statusElement.classList.add('status-in-progress');
+                } else {
+                    statusElement.classList.add('status-completed');
+                }
+            }
+        });
+
+        // Edit carregamento button in modal
+        document.getElementById('btn-editar-carregamento').addEventListener('click', function() {
+            const carregamentoId = parseInt(carregamentoModal.getAttribute('data-current-id'));
+            const carregamento = carregamentos.find(c => c.id === carregamentoId);
+            
+            if (carregamento) {
+                document.getElementById('edit-id').value = carregamento.id;
+                document.getElementById('edit-motorista').value = carregamento.motorista;
+                document.getElementById('edit-empresa').value = carregamento.empresa;
+                
+                // Format date for datetime-local input
+                const [date, time] = carregamento.data.split(' ');
+                const [day, month, year] = date.split('/');
+                document.getElementById('edit-data-hora').value = `${year}-${month}-${day}T${time}`;
+                
+                document.getElementById('edit-transportadora').value = carregamento.transportadora;
+                document.getElementById('edit-tipo-carregamento').value = carregamento.tipo;
+                document.getElementById('edit-documento').value = carregamento.documento;
+                document.getElementById('edit-status').value = carregamento.status;
+                
+                carregamentoModal.style.display = 'none';
+                editarCarregamentoModal.style.display = 'flex';
+            }
+        });
+
+        // Utility functions
+        function formatDateTime(dateTimeString) {
+            const date = new Date(dateTimeString);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            
+            return `${day}/${month}/${year} ${hours}:${minutes}`;
+        }
+
+        function updateCarregamentosTable() {
+            const tbody = document.getElementById('carregamentos-table-body');
+            tbody.innerHTML = '';
+            
+            const selectedDate = document.getElementById('filter-date').value;
+            let filteredCarregamentos = carregamentos;
+            
+            if (selectedDate) {
+                filteredCarregamentos = carregamentos.filter(c => {
+                    const carregamentoDate = c.data.split(' ')[0];
+                    const filterDate = formatDateForDisplay(selectedDate);
+                    return carregamentoDate === filterDate;
+                });
+            }
+            
+            filteredCarregamentos.forEach(carregamento => {
+                const row = document.createElement('tr');
+                row.setAttribute('data-id', carregamento.id);
+                
+                let statusClass = '';
+                if (carregamento.status === 'Pendente') {
+                    statusClass = 'status-pending';
+                } else if (carregamento.status === 'Em Andamento') {
+                    statusClass = 'status-in-progress';
+                } else {
+                    statusClass = 'status-completed';
+                }
+                
+                row.innerHTML = `
+                    <td>${carregamento.motorista}</td>
+                    <td>${carregamento.empresa}</td>
+                    <td>${carregamento.data}</td>
+                    <td>${carregamento.transportadora}</td>
+                    <td>${carregamento.tipo}</td>
+                    <td><span class="status-badge ${statusClass}">${carregamento.status}</span></td>
+                    <td class="action-buttons">
+                        <button class="btn-view" data-id="${carregamento.id}"><i class="fas fa-eye"></i></button>
+                        <button class="action-btn btn-secondary btn-edit" data-id="${carregamento.id}">Editar</button>
+                        <button class="action-btn btn-danger btn-delete" data-id="${carregamento.id}">Excluir</button>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        function updateEmpresasTable() {
+            const tbody = document.getElementById('empresas-table-body');
+            tbody.innerHTML = '';
+            
+            empresas.forEach(empresa => {
+                const row = document.createElement('tr');
+                row.setAttribute('data-id', empresa.id);
+                
+                row.innerHTML = `
+                    <td>${empresa.nome}</td>
+                    <td>${empresa.cnpj}</td>
+                    <td>${empresa.responsavel}</td>
+                    <td>${empresa.visitas}</td>
+                    <td>${empresa.ultimaVisita}</td>
+                    <td class="action-buttons">
+                        <button class="action-btn btn-secondary btn-edit-empresa" data-id="${empresa.id}">Editar</button>
+                        <button class="action-btn btn-danger btn-delete-empresa" data-id="${empresa.id}">Excluir</button>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        function loadAgendamentos() {
+            const tbody = document.getElementById('agendamentos-table-body');
+            tbody.innerHTML = '';
+            
+            const selectedDate = document.getElementById('agendamento-filter-date').value;
+            let agendamentosFiltrados = carregamentos.filter(c => c.status === 'Pendente');
+            
+            if (selectedDate) {
+                agendamentosFiltrados = agendamentosFiltrados.filter(c => {
+                    const carregamentoDate = c.data.split(' ')[0];
+                    const filterDate = formatDateForDisplay(selectedDate);
+                    return carregamentoDate === filterDate;
+                });
+            }
+            
+            agendamentosFiltrados.forEach(carregamento => {
+                const row = document.createElement('tr');
+                row.setAttribute('data-id', carregamento.id);
+                
+                row.innerHTML = `
+                    <td>${carregamento.motorista}</td>
+                    <td>${carregamento.empresa}</td>
+                    <td>${carregamento.data}</td>
+                    <td>${carregamento.transportadora}</td>
+                    <td>${carregamento.tipo}</td>
+                    <td><span class="status-badge status-pending">${carregamento.status}</span></td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        function loadConfiguracoes() {
+            // Configurações do Firebase
+            document.getElementById('toggle-firebase').checked = config.firebaseEnabled;
+            document.getElementById('firebase-config').style.display = config.firebaseEnabled ? 'block' : 'none';
+            
+            if (config.firebaseConfig) {
+                document.getElementById('firebase-apiKey').value = config.firebaseConfig.apiKey || '';
+                document.getElementById('firebase-authDomain').value = config.firebaseConfig.authDomain || '';
+                document.getElementById('firebase-projectId').value = config.firebaseConfig.projectId || '';
+                document.getElementById('firebase-storageBucket').value = config.firebaseConfig.storageBucket || '';
+            }
+        }
+
+        // Additional button functionalities
+        document.getElementById('btn-limpar-form').addEventListener('click', function() {
+            document.getElementById('agendamento-form').reset();
+            showToast('Formulário limpo!');
+        });
+
+        document.getElementById('btn-aplicar-filtro').addEventListener('click', function() {
+            updateDashboardStats();
+            updateCarregamentosTable();
+            showToast('Filtro aplicado com sucesso!');
+        });
+
+        document.getElementById('btn-limpar-filtros').addEventListener('click', function() {
+            document.getElementById('filter-date').value = '';
+            updateDashboardStats();
+            updateCarregamentosTable();
+            showToast('Filtro limpo!');
+        });
+
+        document.getElementById('btn-filtrar-agendamentos').addEventListener('click', function() {
+            loadAgendamentos();
+            showToast('Agendamentos filtrados!');
+        });
+
+        document.getElementById('btn-limpar-filtro-agendamentos').addEventListener('click', function() {
+            document.getElementById('agendamento-filter-date').value = '';
+            loadAgendamentos();
+            showToast('Filtro de agendamentos limpo!');
+        });
+
+        // Configurações do Firebase
+        document.getElementById('toggle-firebase').addEventListener('change', function() {
+            const firebaseConfig = document.getElementById('firebase-config');
+            firebaseConfig.style.display = this.checked ? 'block' : 'none';
+            config.firebaseEnabled = this.checked;
+            saveData();
+            showToast(`Armazenamento Firebase ${this.checked ? 'ativado' : 'desativado'}`);
+        });
+
+        document.getElementById('btn-salvar-firebase').addEventListener('click', function() {
+            config.firebaseConfig = {
+                apiKey: document.getElementById('firebase-apiKey').value,
+                authDomain: document.getElementById('firebase-authDomain').value,
+                projectId: document.getElementById('firebase-projectId').value,
+                storageBucket: document.getElementById('firebase-storageBucket').value
+            };
+            saveData();
+            showToast('Configurações do Firebase salvas!');
+        });
+
+        // Configurações adicionais
+        document.getElementById('btn-adicionar-usuario').addEventListener('click', function() {
+            showToast('Funcionalidade de adicionar usuário será implementada!', 'warning');
+        });
+
+        document.getElementById('btn-listar-usuarios').addEventListener('click', function() {
+            showToast('Funcionalidade de listar usuários será implementada!', 'warning');
+        });
+
+        document.getElementById('btn-exportar-excel').addEventListener('click', function() {
+            showToast('Relatório exportado em Excel!');
+        });
+
+        document.getElementById('btn-exportar-pdf').addEventListener('click', function() {
+            showToast('Relatório exportado em PDF!');
+        });
+
+        document.getElementById('btn-configurar-relatorios').addEventListener('click', function() {
+            showToast('Funcionalidade de configurar relatórios será implementada!', 'warning');
+        });
+
+        document.getElementById('btn-visualizar-acessos').addEventListener('click', function() {
+            showToast('Funcionalidade de visualizar acessos será implementada!', 'warning');
+        });
+
+        document.getElementById('btn-configurar-monitoramento').addEventListener('click', function() {
+            showToast('Funcionalidade de configurar monitoramento será implementada!', 'warning');
+        });
+
+        document.getElementById('btn-copiar-link').addEventListener('click', function() {
+            const linkInput = document.getElementById('link-externo');
+            linkInput.select();
+            document.execCommand('copy');
+            showToast('Link copiado para a área de transferência!');
+        });
+
+        document.getElementById('btn-gerar-novo-link').addEventListener('click', function() {
+            const newLink = `https://carregamentos.com/agendamento-externo-${Date.now()}`;
+            document.getElementById('link-externo').value = newLink;
+            showToast('Novo link gerado com sucesso!');
+        });
+
+        document.getElementById('btn-backup-dados').addEventListener('click', function() {
+            const backupData = {
+                carregamentos: carregamentos,
+                empresas: empresas,
+                config: config,
+                backupDate: new Date().toISOString()
+            };
+            
+            const dataStr = JSON.stringify(backupData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `backup-carregamentos-${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            
+            URL.revokeObjectURL(url);
+            showToast('Backup dos dados realizado com sucesso!');
+        });
+
+        document.getElementById('btn-restaurar-dados').addEventListener('click', function() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = function(event) {
+                    try {
+                        const backupData = JSON.parse(event.target.result);
+                        
+                        if (backupData.carregamentos && backupData.empresas) {
+                            if (confirm('Tem certeza que deseja restaurar os dados do backup? Isso substituirá todos os dados atuais.')) {
+                                carregamentos = backupData.carregamentos;
+                                empresas = backupData.empresas;
+                                config = backupData.config || config;
+                                
+                                saveData();
+                                updateCarregamentosTable();
+                                updateEmpresasTable();
+                                updateDashboardStats();
+                                showToast('Dados restaurados com sucesso!');
+                            }
+                        } else {
+                            showToast('Arquivo de backup inválido!', 'error');
+                        }
+                    } catch (error) {
+                        showToast('Erro ao restaurar dados: ' + error.message, 'error');
+                    }
+                };
+                
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        });
+
+        document.getElementById('btn-limpar-dados').addEventListener('click', function() {
+            if (confirm('Tem certeza que deseja limpar TODOS os dados? Esta ação não pode ser desfeita.')) {
+                if (confirm('Esta ação irá remover todos os carregamentos e empresas. Confirme novamente.')) {
+                    carregamentos = [];
+                    empresas = [];
+                    saveData();
+                    updateCarregamentosTable();
+                    updateEmpresasTable();
+                    updateDashboardStats();
+                    showToast('Todos os dados foram limpos!', 'warning');
+                }
+            }
+        });
+
+        // Initialize
+        function initializeApp() {
+            // Set today's date as default
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('filter-date').value = today;
+            
+            updateDashboardStats();
+            updateCarregamentosTable();
+            updateEmpresasTable();
+            loadConfiguracoes();
+        }
+
+        // Initialize the app
+        initializeApp();
+    </script>
+</body>
+</html>
